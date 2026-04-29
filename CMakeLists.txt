@@ -83,6 +83,7 @@ set(IMPORT_PROTO_SRC
     uFilterPickerProxyAPI/v1/stream_identifier.proto
     uFilterPickerProxyAPI/v1/phase_hint.proto
     uFilterPickerProxyAPI/v1/pick.proto
+    uFilterPickerProxyAPI/v1/algorithm.proto
     )   
 set(LIBRARY_HEADER_FILES 
     include/uFilterPickerProxy/database.hpp
