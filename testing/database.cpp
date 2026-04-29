@@ -13,6 +13,8 @@
 #ifndef NDEBUG
 #include <cassert>
 #endif
+#include <spdlog/logger.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <google/protobuf/util/time_util.h>
 #include "uFilterPickerProxy/database.hpp"
 #include <uFilterPickerProxyAPI/v1/pick.pb.h>
@@ -30,9 +32,10 @@ TEST_CASE("UFilterPickerProxy", "[Database]")
     namespace UFP = UFilterPickerProxy;
     SECTION("Create")
     {
+        auto logger = spdlog::stdout_color_mt("create-db-logger");
         const std::filesystem::path sqliteFile{"testFile.sqlite3"};
         if (std::filesystem::exists(sqliteFile)){std::filesystem::remove(sqliteFile);}
-        UFP::Database db{sqliteFile, UFP::Database::Mode::Create};
+        UFP::Database db{logger, sqliteFile, UFP::Database::Mode::Create};
         REQUIRE(db.isOpen()); 
         REQUIRE(!db.isReadOnly());
 
@@ -52,7 +55,7 @@ TEST_CASE("UFilterPickerProxy", "[Database]")
         pick.set_algorithm(algorithm);
         *pick.mutable_time() = google::protobuf::util::TimeUtil::SecondsToTimestamp(pickTime.count());
 
-        db.add(pick);
+        REQUIRE_NOTHROW(db.add(pick));
          
     }
     

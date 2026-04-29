@@ -23,7 +23,9 @@ public:
     }; 
 public:
     /// @brief Opens/creates the database.
-    Database(const std::filesystem::path &sqliteFile, Mode mode);
+    Database(std::shared_ptr<spdlog::logger> logger,
+             const std::filesystem::path &sqliteFile,
+             Mode mode);
     /// @result True indicates the database is open.
     [[nodiscard]] bool isOpen() const noexcept;
     /// @result True indicates the database is open in read-only mode

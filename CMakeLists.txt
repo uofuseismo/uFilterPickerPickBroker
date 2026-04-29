@@ -77,6 +77,7 @@ configure_file(${CMAKE_SOURCE_DIR}/src/version.hpp.in
 
 set(LIBRARY_SRC
     src/database.cpp
+    src/exception.cpp
     src/version.cpp)
 set(IMPORT_PROTO_SRC
     uFilterPickerProxyAPI/v1/stream_identifier.proto
@@ -85,6 +86,7 @@ set(IMPORT_PROTO_SRC
     )   
 set(LIBRARY_HEADER_FILES 
     include/uFilterPickerProxy/database.hpp
+    include/uFilterPickerProxy/exception.hpp
     include/uFilterPickerProxy/version.hpp)
 
 add_library(libuFilterPickerProxy STATIC ${LIBRARY_SRC} ${IMPORT_PROTO_SRC})

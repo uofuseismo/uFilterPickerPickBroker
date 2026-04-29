@@ -1,22 +1,31 @@
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <memory>
 #include <set>
 #include <array>
 #include <algorithm>
-#include <iostream>
 #include <mutex>
 #include <string>
 #include <stdexcept>
 #include <filesystem>
 #include <map>
+#ifndef NDEBUG
+#include <cassert>
+#endif
 #include <sqlite3.h>
 #include <spdlog/spdlog.h>
+#include <spdlog/logger.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <google/protobuf/util/time_util.h>
 #include <uFilterPickerProxyAPI/v1/pick.pb.h>
 #include <uFilterPickerProxyAPI/v1/stream_identifier.pb.h>
 #include <uFilterPickerProxyAPI/v1/phase_hint.pb.h>
 #include "uFilterPickerProxy/database.hpp"
+#include "uFilterPickerProxy/exception.hpp"
+
+#define N_PHASE_HINTS 3
 
 using namespace UFilterPickerProxy;
 
@@ -40,9 +49,22 @@ std::string removeBlanksAndCapitalize(const std::string &stringIn)
 class Database::DatabaseImpl
 {
 public:
-    DatabaseImpl(const std::filesystem::path &fileName,
-                 const Database::Mode mode)
+    DatabaseImpl(std::shared_ptr<spdlog::logger> logger,
+                 const std::filesystem::path &fileName,
+                 const Database::Mode mode) :
+        mLogger(std::move(logger))
     {
+        if (mLogger == nullptr)
+        {
+            //NOLINTBEGIN(misc-include-cleaner)
+            auto classId
+                = std::to_string (reinterpret_cast<std::uintptr_t> (this));
+            mLogger = spdlog::stdout_color_mt("sqlite-db-" + classId);
+            //NOLINTEND(misc-include-cleaner)
+        }
+#ifndef NDEBUG
+        assert(mLogger != nullptr);
+#endif
         if (mode == Database::Mode::ReadOnly)
         {
             openReadOnly(fileName);
@@ -99,6 +121,8 @@ public:
             }
             openReadWrite(fileName, createDatabase);
         }
+        // Always initialize phase hints
+        initializePhaseHintMap();
     }
         
     void openReadOnly(const std::filesystem::path &fileName)
@@ -134,14 +158,16 @@ public:
         int flags = SQLITE_OPEN_READWRITE;
         if (createDatabase)
         {
-            spdlog::info("Will create database " + std::string{fileName});
+            SPDLOG_LOGGER_INFO(mLogger, "Will create database {}",
+                               std::string{fileName});
             mTablesInitialized = false;
             flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
         }
         else
         {
-            spdlog::info("Will open database " + std::string{fileName}
-                       + " as read-write");
+            SPDLOG_LOGGER_INFO(mLogger,
+                               "Will open database {} as read-write",
+                               std::string{fileName});
         }
         const char *vfs{nullptr};
         auto returnCode = sqlite3_open_v2(fileName.c_str(), 
@@ -173,7 +199,7 @@ public:
     {
         if (isOpen())
         {
-            spdlog::info("Closing database");
+            SPDLOG_LOGGER_INFO(mLogger, "Closing database");
             sqlite3_close(mDatabaseHandle);
             mMode = Database::Mode::ReadOnly;
             mIsOpen = false;
@@ -196,7 +222,7 @@ public:
         {
             throw std::runtime_error("Cannot create read-only database");
         }
-        spdlog::info("Creating tables");
+        SPDLOG_LOGGER_INFO(mLogger, "Creating tables");
         mTablesInitialized = false;
         char *errorMessage{nullptr};
         const std::string phaseHintTable{
@@ -265,17 +291,41 @@ CREATE TABLE streams(
                + message);
         }
 
+        const std::string algorithmsTable{
+R"""(
+CREATE TABLE algorithms(
+   identifier INTEGER PRIMARY KEY ASC,
+   name TEXT NOT NULL DEFAULT('uFilterPicker'),
+   version TEXT NOT NULL
+   tag TEXT);
+)"""
+        };  
+        returnCode = sqlite3_exec(mDatabaseHandle,
+                                  algorithmsTable.c_str(),
+                                  nullptr,
+                                  nullptr,
+                                  &errorMessage);
+        if (returnCode != SQLITE_OK)
+        {
+            auto message = std::string{errorMessage};
+            sqlite3_free(errorMessage);
+            throw std::runtime_error(
+                "Failed to create algorithms table because "
+               + message);
+        }
+
         const std::string pickTable{
 R"""(
 CREATE TABLE picks(
-   stream_identifier INTEGER,
+   stream INTEGER,
    time INT8, 
    phase_hint INTEGER,
-   algorithm TEXT DEFAULT('uFilterPicker'),
+   algorithm INTEGER,
    load_time DATETIME DEFAULT (DATETIME(current_timestamp)),
-   UNIQUE(stream_identifier, time, phase_hint, algorithm),
-   FOREIGN KEY(stream_identifier) REFERENCES streams(identifier),
-   FOREIGN KEY(phase_hint) REFERENCES phase_hints(phase_identifier));
+   UNIQUE(stream, time, phase_hint, algorithm),
+   FOREIGN KEY(stream) REFERENCES streams(identifier),
+   FOREIGN KEY(phase_hint) REFERENCES phase_hints(phase_identifier),
+   FOREIGN KEY(algorithm) REFERENCES algorithms(identifier));
 )"""};
 
         returnCode = sqlite3_exec(mDatabaseHandle,
@@ -309,14 +359,14 @@ CREATE TABLE picks(
                         + station + "."
                         + channel + "."
                         + locationCode;
-        const std::lock_guard<std::mutex> lock(mMutex);
         {
+        const std::lock_guard<std::mutex> lock(mMutex);
         auto idx = mStreamIdentifiersMap.find(name);
         if (idx != mStreamIdentifiersMap.end())
         {
             return idx->second;
         }
-        spdlog::info("Will add " + name);
+        SPDLOG_LOGGER_INFO(mLogger, "Will add {} to streams", name);
         const std::string insertSQL{
 R"""(
 INSERT INTO streams(network, station, channel, location_code) VALUES(?, ?, ?, ?) RETURNING identifier;
@@ -364,12 +414,14 @@ INSERT INTO streams(network, station, channel, location_code) VALUES(?, ?, ?, ?)
         if (returnCode == SQLITE_ROW)
         {
             streamIdentifier = sqlite3_column_int(insertStatement, 0);
-            spdlog::info("Got stream identifier "
-                       + std::to_string(streamIdentifier));
+            SPDLOG_LOGGER_DEBUG(mLogger,
+                                "Got stream identifier {} from db",
+                                std::to_string(streamIdentifier));
         }
         if (sqlite3_step(insertStatement) != SQLITE_DONE)
         {
-            spdlog::error("There exists more rows");
+            SPDLOG_LOGGER_WARN(mLogger,
+                               "There exists more rows but terminating early");
         }
         // Clean up
         if (sqlite3_finalize(insertStatement) != SQLITE_OK)
@@ -383,22 +435,69 @@ INSERT INTO streams(network, station, channel, location_code) VALUES(?, ?, ?, ?)
 
     void add(const UFilterPickerProxyAPI::V1::Pick &pick)
     {
+        // Tabulate variables
         auto streamIdentifier = getStreamIdentifier(pick.stream_identifier());
         if (streamIdentifier ==-1)
         {
             throw std::runtime_error("Failed to get stream identifier");
         }
-        // Insert
-       /* 
-picks(
-   stream_identifier INTEGER,
-   time INT8, 
-   phase_hint INTEGER,
-   algorithm TEXT DEFAULT('uFilterPicker'),
-   load_time DATETIME DEFAULT (DATETIME(current_timestamp)),
-   FOREIGN KEY(stream_identifier) REFERENCES streams(identifier),
-   FOREIGN KEY(phase_hint) REFERENCES phase_hints(phase_identifier));
+        auto phaseHintIdentifier = getPhaseHintIdentifier(pick.phase_hint());
+        const int64_t time
+            = google::protobuf::util::TimeUtil::TimestampToNanoseconds(
+                 pick.time());
+        const std::string algorithm 
+            = (pick.has_algorithm() ? pick.algorithm() : "uFilterPicker");
+//ON CONFLICT DO NOTHING
+        const std::string insertSQL{
+R"""(
+INSERT INTO picks(stream, time, phase_hint) VALUES(?, ?, ?);
+)"""
+        };
+        // Insert it
+        {
+
+        sqlite3_stmt *insertStatement{nullptr};
+        auto returnCode = sqlite3_prepare_v2(mDatabaseHandle,
+                                             insertSQL.c_str(),
+                                             -1,
+                                             &insertStatement,
+                                             nullptr);
+        returnCode = sqlite3_bind_int(insertStatement, 1, streamIdentifier);
+        if (returnCode != SQLITE_OK)
+        {
+            sqlite3_finalize(insertStatement);
+            throw std::runtime_error("Failed to bind stream identifier");
+        }
+        returnCode = sqlite3_bind_int64(insertStatement, 2, time);
+        if (returnCode != SQLITE_OK)
+        {
+            sqlite3_finalize(insertStatement);
+            throw std::runtime_error("Failed to bind time");
+        }
+        returnCode = sqlite3_bind_int(insertStatement, 3, phaseHintIdentifier);
+        if (returnCode != SQLITE_OK)
+        {
+            sqlite3_finalize(insertStatement);
+            throw std::runtime_error("Failed to bind phase hint");
+        }
+/*
+        returnCode = sqlite3_bind_text(insertStatement, 1, pick, nullptr);
+        if (returnCode != SQLITE_OK)
+        {
+            sqlite3_finalize(insertStatement);
+            throw std::runtime_error("Failed to bind time");
+        }
 */
+        // Send it
+        returnCode = sqlite3_step(insertStatement);
+        SPDLOG_LOGGER_INFO(mLogger, "rc {}", returnCode);
+        // Clean up
+        if (sqlite3_finalize(insertStatement) != SQLITE_OK)
+        {
+            throw std::runtime_error("Failed to finalize insert statement");
+        }
+
+        }
     }
 
     [[nodiscard]] bool isReadOnly() const noexcept
@@ -418,6 +517,69 @@ picks(
         }
         return result;
     } 
+
+    [[nodiscard]] 
+    int getPhaseHintIdentifier(
+        const UFilterPickerProxyAPI::V1::PhaseHint phaseHint) const
+    {
+        namespace UFPAPI = UFilterPickerProxyAPI::V1;
+        if (phaseHint == UFPAPI::PhaseHint::PHASE_HINT_P)
+        {
+            return mPhaseHintMap.at("P");
+        }
+        else if (phaseHint == UFPAPI::PhaseHint::PHASE_HINT_S)
+        {
+            return mPhaseHintMap.at("S");
+        }
+        else if (phaseHint == UFPAPI::PhaseHint::PHASE_HINT_UNKNOWN)
+        {
+            return mPhaseHintMap.at("Unknown");
+        }
+        else
+        {
+            throw std::invalid_argument("Unhandled phase hint of type "
+                                      + std::to_string(phaseHint)); 
+        }
+    }
+
+    void initializePhaseHintMap()
+    {
+        if (!isOpen()){throw std::runtime_error("Database not open");} 
+        const std::string phaseHintQuery{
+            "SELECT identifier, phase FROM phase_hints"};
+	sqlite3_stmt *statement{nullptr};
+        {
+        const std::lock_guard<std::mutex> lock(mMutex);
+	auto returnCode
+            = sqlite3_prepare_v2(mDatabaseHandle, 
+                                 phaseHintQuery.c_str(),
+                                 -1, &statement, nullptr);
+        if (returnCode != SQLITE_OK)
+        {
+            sqlite3_finalize(statement);
+            throw std::runtime_error("Failed to prepare select statement");
+        }
+        while (sqlite3_step(statement) != SQLITE_DONE)
+        {
+            auto identifier = sqlite3_column_int(statement, 0);
+            auto phaseName
+                = std::string{
+                    reinterpret_cast<const char *>
+                        (sqlite3_column_text(statement, 1))
+                  };
+            mPhaseHintMap.insert_or_assign(phaseName, identifier);
+        }
+        // Clean up
+        if (sqlite3_finalize(statement) != SQLITE_OK)
+        {
+            throw std::runtime_error("Failed to finalize insert statement");
+        }
+        }
+        if (mPhaseHintMap.size() != N_PHASE_HINTS)
+        {
+            throw std::runtime_error("Expecting 3 phase hints");
+        }
+    }
 /*
     [[nodiscard]] int getPhaseHintIdentifier()
     {
@@ -430,18 +592,21 @@ picks(
         close();
     }
 //private:
+    std::shared_ptr<spdlog::logger> mLogger{nullptr};
     mutable std::mutex mMutex;
     sqlite3 *mDatabaseHandle{nullptr};
     std::map<std::string, int> mStreamIdentifiersMap;
-//    std::map<std::string, int> mPhaseHints;
+    std::map<std::string, int> mPhaseHintMap;
     Database::Mode mMode{Database::Mode::ReadOnly};
     bool mIsOpen{false}; 
     bool mTablesInitialized{false};
 };
 
-Database::Database(const std::filesystem::path &fileName,
-                   const Database::Mode mode) :
-    pImpl(std::make_unique<DatabaseImpl> (fileName, mode))
+Database::Database(
+    std::shared_ptr<spdlog::logger> logger,
+    const std::filesystem::path &fileName,
+    const Database::Mode mode) :
+    pImpl(std::make_unique<DatabaseImpl> (std::move(logger), fileName, mode))
 {
 }
 
