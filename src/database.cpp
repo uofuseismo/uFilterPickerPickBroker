@@ -207,6 +207,7 @@ public:
             SPDLOG_LOGGER_INFO(mLogger,
                                "Will open database {} as read-write",
                                std::string{fileName});
+            mTablesInitialized = true;
         }
         const char *vfs{nullptr};
         auto returnCode = sqlite3_open_v2(fileName.c_str(), 
@@ -226,7 +227,6 @@ public:
                                    + errorMessage);
         }
         mIsOpen = true;
-        mTablesInitialized = true;
         mMode = Database::Mode::ReadWrite;
         if (createDatabase)
         {
