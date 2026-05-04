@@ -61,13 +61,13 @@ find_package(Git)
 if (Git_FOUND)
    execute_process(
      COMMAND ${GIT_EXECUTABLE} --no-pager log -n 1 HEAD "--pretty=format:%h"
-     OUTPUT_VARIABLE uFilterPicker_GITTAG
+     OUTPUT_VARIABLE uFilterPickerProxy_GITTAG
      RESULT_VARIABLE gitresult
      ERROR_QUIET
      OUTPUT_STRIP_TRAILING_WHITESPACE
    )
    if (gitresult EQUAL 0)
-      message(STATUS "Last Git commit: ${uFilterPicker_GITTAG}")
+      message(STATUS "Last Git commit: ${uFilterPickerProxy_GITTAG}")
    endif()
 else()
    set(uFilterPickerProxy_GITTAG "")
