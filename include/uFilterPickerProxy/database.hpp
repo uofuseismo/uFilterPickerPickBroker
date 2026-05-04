@@ -2,6 +2,9 @@
 #define UFILTER_PICKER_PROXY_DATABASE_HPP
 #include <memory>
 #include <filesystem>
+#include <chrono>
+#include <vector>
+#include <spdlog/logger.h>
 namespace UFilterPickerProxyAPI::V1
 {
  class Pick;
@@ -33,6 +36,12 @@ public:
     [[nodiscard]] bool isReadOnly() const noexcept;
     /// @brief Add a pick.
     void add(const UFilterPickerProxyAPI::V1::Pick &pick);
+
+    /// @result All picks currently in the database.
+    [[nodiscard]] std::vector<UFilterPickerProxyAPI::V1::Pick> getAllPicks() const;
+    /// @result The picks in the database whose time exceeds the given value.
+    [[nodiscard]] std::vector<UFilterPickerProxyAPI::V1::Pick> getPicksSince(
+        const std::chrono::microseconds &startTime) const;
     /// @brief Destructor.
     ~Database();
 

@@ -3,12 +3,15 @@
 #include <utility>
 #include <memory>
 #include <set>
+#include <limits>
 #include <algorithm>
 #include <mutex>
 #include <string>
 #include <stdexcept>
 #include <filesystem>
+#include <chrono>
 #include <map>
+#include <vector>
 #ifndef NDEBUG
 #include <cassert>
 #endif
@@ -841,6 +844,62 @@ INSERT INTO picks(stream, time, phase_hint, algorithm, proto) VALUES(?, ?, ?, ?,
         }
     }
 
+    [[nodiscard]] std::vector<UFilterPickerProxyAPI::V1::Pick> 
+        getAllPicks() const
+    {
+        constexpr std::chrono::microseconds zero{
+            std::numeric_limits<std::chrono::microseconds::rep>::lowest()
+        };
+        return getPicksSince(zero);
+    }
+
+    [[nodiscard]] std::vector<UFilterPickerProxyAPI::V1::Pick> 
+        getPicksSince(const std::chrono::microseconds &startTime) const
+    {
+        std::vector<UFilterPickerProxyAPI::V1::Pick> result;
+        if (!isOpen())
+        {
+            throw std::runtime_error("Database not open");
+        }
+        const std::string querySQL{
+R"""(
+SELECT proto FROM picks WHERE time > ? ORDER BY load_time ASC;
+)"""
+        };
+	    sqlite3_stmt *statement{nullptr};
+        {
+        const std::lock_guard<std::mutex> lock(mMutex);
+	    auto returnCode
+            = sqlite3_prepare_v2(mDatabaseHandle, 
+                                 querySQL.c_str(),
+                                 -1, &statement, nullptr);
+        if (returnCode != SQLITE_OK)
+        {
+            sqlite3_finalize(statement);
+            throw std::runtime_error(
+                "Failed to prepare select all picks statement");
+        }
+        const auto startTimeNs 
+            = std::chrono::duration_cast<std::chrono::nanoseconds>(startTime);
+        ::bindInt64(startTimeNs.count(), 1, "start_time", "pick", statement);
+        while (sqlite3_step(statement) != SQLITE_DONE)
+        {
+            const auto pickProtoBlob
+                = reinterpret_cast<const char *>
+                  (sqlite3_column_blob(statement, 0));
+            const auto pickProtoSize = sqlite3_column_bytes(statement, 0);
+            const std::string pickProto(pickProtoBlob, pickProtoSize);
+            UFilterPickerProxyAPI::V1::Pick pick;
+            if (!pick.ParseFromString(pickProto))
+            {
+                throw std::runtime_error("Failed to parse pick proto");
+            }
+            result.push_back(std::move(pick));
+        }        
+        }
+        return result;
+    }    
+
     ~DatabaseImpl()
     {
         close();
@@ -916,6 +975,27 @@ void Database::add(const UFilterPickerProxyAPI::V1::Pick &pick)
         throw std::invalid_argument("Algorithm version not set");
     }
     pImpl->add(pick);
+}
+
+/// All picks currently in the database.
+std::vector<UFilterPickerProxyAPI::V1::Pick> Database::getAllPicks() const
+{
+    if (!isOpen())
+    {
+        throw std::runtime_error("Database not open");
+    }
+    return pImpl->getAllPicks();
+}
+
+/// The picks in the database whose time exceeds the given value.
+std::vector<UFilterPickerProxyAPI::V1::Pick> Database::getPicksSince(
+    const std::chrono::microseconds &startTime) const
+{
+    if (!isOpen())
+    {
+        throw std::runtime_error("Database not open");
+    }
+    return pImpl->getPicksSince(startTime);
 }
 
 /// Destructor
