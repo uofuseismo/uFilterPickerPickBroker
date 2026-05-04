@@ -77,6 +77,7 @@ configure_file(${CMAKE_SOURCE_DIR}/src/version.hpp.in
 
 set(LIBRARY_SRC
     src/database.cpp
+   src/grpcServerOptions.cpp
     src/exception.cpp
     src/version.cpp)
 set(IMPORT_PROTO_SRC
@@ -87,6 +88,7 @@ set(IMPORT_PROTO_SRC
     )   
 set(LIBRARY_HEADER_FILES 
     include/uFilterPickerProxy/database.hpp
+    include/uFilterPickerProxy/grpcServerOptions.hpp
     include/uFilterPickerProxy/exception.hpp
     include/uFilterPickerProxy/version.hpp)
 
@@ -202,6 +204,7 @@ target_link_libraries(uFilterPickerProxy
 if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
    add_executable(unitTests
                   testing/database.cpp
+                  testing/grpcOptions.cpp
    #               testing/utilities.cpp
    #               testing/picker.cpp
    #               testing/grpc.cpp
