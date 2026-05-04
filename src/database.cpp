@@ -1,10 +1,8 @@
 #include <cctype>
-#include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <memory>
 #include <set>
-#include <array>
 #include <algorithm>
 #include <mutex>
 #include <string>
@@ -55,31 +53,88 @@ void bindText(const std::string &text,
     }
 }
 
+void bindBlob(const std::string &text,
+              const int index,
+              const std::string &column,
+              const std::string &table,
+              sqlite3_stmt *statement)
+{
+#ifndef NDEBUG
+    assert(index > 0);
+#endif
+    auto returnCode
+        = sqlite3_bind_blob(
+             statement, index,
+             text.c_str(), static_cast<int> (text.size()), nullptr);
+    if (returnCode != SQLITE_OK)
+    {
+        sqlite3_finalize(statement);
+        throw std::runtime_error("Failed to bind blob to "
+                               + column + " " + table);
+    }
+}
+
+void bindInt(const int value,
+             const int index,
+             const std::string &column,
+             const std::string &table,
+             sqlite3_stmt *statement)
+{
+#ifndef NDEBUG
+    assert(index > 0);
+#endif
+    auto returnCode
+        = sqlite3_bind_int(statement, index, value);
+    if (returnCode != SQLITE_OK)
+    {
+        sqlite3_finalize(statement);
+        throw std::runtime_error("Failed to bind int "
+                               + std::to_string(value) + " to "
+                               + column + " " + table);
+    }
+}
+
+void bindInt64(const int64_t value,
+               const int index,
+               const std::string &column,
+               const std::string &table,
+               sqlite3_stmt *statement)
+{
+#ifndef NDEBUG
+    assert(index > 0);
+#endif
+    auto returnCode
+        = sqlite3_bind_int64(statement, index, value);
+    if (returnCode != SQLITE_OK)
+    {
+        sqlite3_finalize(statement);
+        throw std::runtime_error("Failed to bind int64 "
+                               + std::to_string(value) + " to "
+                               + column + " " + table);
+    }
+}
+
 std::string removeBlanksAndCapitalize(const std::string &stringIn)
 {
     auto string = stringIn; 
-    string.erase(
-        std::remove_if(string.begin(), string.end(), ::isspace),
-        string.end());
+    std::erase_if(string, ::isspace);
     if (string.empty())
     {
         throw std::invalid_argument("SNCL has empty field");
     }
-    std::transform(string.begin(), string.end(), string.begin(), ::toupper);
+    std::ranges::transform(string, string.begin(), ::toupper);
     return string;
 }
 
 std::string removeBlanksAndLowerCase(const std::string &stringIn)
 {
     auto string = stringIn; 
-    string.erase(
-        std::remove_if(string.begin(), string.end(), ::isspace),
-        string.end());
+    std::erase_if(string, ::isspace);
     if (string.empty())
     {   
         throw std::invalid_argument("Algorithm has empty field");
     }   
-    std::transform(string.begin(), string.end(), string.begin(), ::tolower);
+    std::ranges::transform(string, string.begin(), ::tolower);
     return string;
 }
 
@@ -174,7 +229,7 @@ public:
                               + " in read-only mode because it does not exist");
         }
         const char *vfs{nullptr};
-        const int flags{SQLITE_OPEN_READWRITE};
+        constexpr int flags{SQLITE_OPEN_READWRITE};
         auto returnCode = sqlite3_open_v2(fileName.c_str(), 
                                           &mDatabaseHandle,
                                           flags,
@@ -362,6 +417,7 @@ CREATE TABLE picks(
    time INT8, 
    phase_hint INTEGER,
    algorithm INTEGER,
+   proto BLOB NOT NULL,
    load_time DATETIME DEFAULT (DATETIME(current_timestamp)),
    UNIQUE(stream, time, phase_hint, algorithm),
    FOREIGN KEY(stream) REFERENCES streams(identifier),
@@ -411,7 +467,8 @@ CREATE TABLE picks(
         SPDLOG_LOGGER_INFO(mLogger, "Will add {} to streams", name);
         const std::string insertSQL{
 R"""(
-INSERT INTO streams(network, station, channel, location_code) VALUES(?, ?, ?, ?) RETURNING identifier;
+INSERT INTO streams(network, station, channel, location_code)
+            VALUES(?, ?, ?, ?) RETURNING identifier;
 )"""
         };
 	sqlite3_stmt *insertStatement{nullptr};
@@ -434,32 +491,6 @@ INSERT INTO streams(network, station, channel, location_code) VALUES(?, ?, ?, ?)
                    "streams", insertStatement);
         ::bindText(locationCode, 4, "location_code",
                    "streams", insertStatement);
-/*
-        std::array<std::pair<std::string, std::string>, 4>
-            insertMap
-            {
-                std::pair<std::string, std::string> {"network", network},
-                std::pair<std::string, std::string> {"station", station},
-                std::pair<std::string, std::string> {"channel", channel},
-                std::pair<std::string, std::string> {"locationCode", locationCode}
-            };
-        for (size_t i = 1; i < insertMap.size(); ++i)
-        {
-            const auto index = static_cast<int> (i + 1);
-            const auto element = insertMap[i];
-            returnCode = sqlite3_bind_text(
-                insertStatement,
-                index,
-                element.second.c_str(),
-                static_cast<int> (element.second.size()),
-                nullptr);
-            if (returnCode != SQLITE_OK)
-            {
-                sqlite3_finalize(insertStatement);
-                throw std::runtime_error("Failed to bind " + element.first);
-            }
-        }
-*/
         // Send it
         returnCode = sqlite3_step(insertStatement);
         // Try to get the corresponding identifier
@@ -598,6 +629,11 @@ INSERT INTO algorithms(name, version, tag) VALUES(?, ?, ?) RETURNING identifier;
         const int64_t time
             = google::protobuf::util::TimeUtil::TimestampToNanoseconds(
                  pick.time());
+        std::string pickProto;
+        if (!pick.SerializeToString(&pickProto))
+        {
+            throw std::runtime_error("Failed to serialize pick proto"); 
+        } 
 /*
         const std::string algorithm 
             = (pick.has_algorithm() ? pick.algorithm() : "uFilterPicker");
@@ -605,10 +641,11 @@ INSERT INTO algorithms(name, version, tag) VALUES(?, ?, ?) RETURNING identifier;
 //ON CONFLICT DO NOTHING
         const std::string insertSQL{
 R"""(
-INSERT INTO picks(stream, time, phase_hint, algorithm) VALUES(?, ?, ?, ?);
+INSERT INTO picks(stream, time, phase_hint, algorithm, proto) VALUES(?, ?, ?, ?, ?);
 )"""
         };
         // Insert it
+       
         {
 
         sqlite3_stmt *insertStatement{nullptr};
@@ -617,30 +654,64 @@ INSERT INTO picks(stream, time, phase_hint, algorithm) VALUES(?, ?, ?, ?);
                                              -1,
                                              &insertStatement,
                                              nullptr);
+        if (returnCode != SQLITE_OK)
+        {
+          sqlite3_finalize(insertStatement);
+          throw std::runtime_error("Failed to prepare pick insert statement");
+        }
+        ::bindInt(streamIdentifier, 1,
+          "stream", "pick", insertStatement);
+        /*
         returnCode = sqlite3_bind_int(insertStatement, 1, streamIdentifier);
         if (returnCode != SQLITE_OK)
         {
             sqlite3_finalize(insertStatement);
             throw std::runtime_error("Failed to bind stream identifier");
         }
+        */
+        ::bindInt64(time, 2,
+          "time", "pick", insertStatement);
+        /*
         returnCode = sqlite3_bind_int64(insertStatement, 2, time);
         if (returnCode != SQLITE_OK)
         {
             sqlite3_finalize(insertStatement);
             throw std::runtime_error("Failed to bind time");
         }
+        */
+        ::bindInt(phaseHintIdentifier, 3,
+          "phase_hint", "pick", insertStatement);
+        /*
         returnCode = sqlite3_bind_int(insertStatement, 3, phaseHintIdentifier);
         if (returnCode != SQLITE_OK)
         {
             sqlite3_finalize(insertStatement);
             throw std::runtime_error("Failed to bind phase hint");
         }
+        */
+        ::bindInt(algorithmIdentifier, 4,
+            "algorithm_identifier", "pick", insertStatement);
+        /*
         returnCode = sqlite3_bind_int(insertStatement, 4, algorithmIdentifier);
         if (returnCode != SQLITE_OK)
         {
             sqlite3_finalize(insertStatement);
             throw std::runtime_error("Failed to bind algorithm");
         }
+        */
+        ::bindBlob(pickProto.data(), 5,
+          "proto", "pick", insertStatement);
+        /*
+        returnCode = sqlite3_bind_blob(insertStatement, 5,
+                                       pickProto.data(),
+                                       static_cast<int> (pickProto.size()),
+                                       nullptr);
+        if (returnCode != SQLITE_OK)
+        {
+            sqlite3_finalize(insertStatement);
+            throw std::runtime_error("Failed to bind proto");
+        }
+        */
         // Send it
         returnCode = sqlite3_step(insertStatement);
         SPDLOG_LOGGER_INFO(mLogger, "rc {}", returnCode);
