@@ -40,7 +40,7 @@ GRPCServerOptions::GRPCServerOptions(GRPCServerOptions &&options) noexcept
 /// Copy assignment operator
 GRPCServerOptions& GRPCServerOptions::operator=(const GRPCServerOptions &options)
 {
-    if (this != &options){return *this;}
+    if (&options == this){return *this;}
     pImpl = std::make_unique<GRPCServerOptionsImpl>(*options.pImpl);
     return *this;
 }

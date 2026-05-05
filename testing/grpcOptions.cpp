@@ -32,15 +32,17 @@ TEST_CASE("UFilterPickerProxy", "[grpcServerOptions]")
         options.setServerKey(serverKey);
         options.setAccessToken(token);
         options.enableReflection();
+
+        const UFilterPickerProxy::GRPCServerOptions copy{options};
         
-        REQUIRE(options.getHost() == host);
-        REQUIRE(options.getPort() == port);
-        REQUIRE(options.getServerCertificate() != std::nullopt);
-        REQUIRE(options.getServerKey() != std::nullopt);
-        REQUIRE(options.getAccessToken() != std::nullopt);
-        REQUIRE(*options.getServerCertificate() == serverCertificate); //NOLINT
-        REQUIRE(*options.getServerKey() == serverKey); //NOLINT
-        REQUIRE(*options.getAccessToken() == token); //NOLINT
-        REQUIRE(options.isReflectionEnabled() == true); 
+        REQUIRE(copy.getHost() == host);
+        REQUIRE(copy.getPort() == port);
+        REQUIRE(copy.getServerCertificate() != std::nullopt);
+        REQUIRE(copy.getServerKey() != std::nullopt);
+        REQUIRE(copy.getAccessToken() != std::nullopt);
+        REQUIRE(*copy.getServerCertificate() == serverCertificate); //NOLINT
+        REQUIRE(*copy.getServerKey() == serverKey); //NOLINT
+        REQUIRE(*copy.getAccessToken() == token); //NOLINT
+        REQUIRE(copy.isReflectionEnabled() == true); 
     }   
 }
