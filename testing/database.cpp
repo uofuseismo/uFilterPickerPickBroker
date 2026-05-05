@@ -28,12 +28,43 @@
 #include <catch2/matchers/catch_matchers.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+namespace
+{
+
+bool comparePicks(const auto &lhs, const auto &rhs)
+{
+    if (lhs.stream_identifier().network() !=
+        rhs.stream_identifier().network()){return false;}
+    if (lhs.stream_identifier().station() !=
+        rhs.stream_identifier().station()){return false;}
+    if (lhs.stream_identifier().channel() != 
+        rhs.stream_identifier().channel()){return false;}
+    if (lhs.stream_identifier().location_code() !=
+        rhs.stream_identifier().location_code())
+    {
+        return false;
+    }
+    if (google::protobuf::util::TimeUtil::TimestampToNanoseconds(lhs.time()) != 
+        google::protobuf::util::TimeUtil::TimestampToNanoseconds(rhs.time()))
+    {
+        return false;
+    }
+
+    if (lhs.phase_hint() != rhs.phase_hint()){return false;}
+
+    if (lhs.algorithm().name() != rhs.algorithm().name()){return false;}
+    if (lhs.algorithm().version() != rhs.algorithm().version()){return false;}
+    if (lhs.algorithm().tag() != rhs.algorithm().tag()){return false;}
+    return true;
+}
+}
+
 TEST_CASE("UFilterPickerProxy", "[Database]")
 {
     namespace UFP = UFilterPickerProxy;
     SECTION("Create")
     {
-        auto logger = spdlog::stdout_color_mt("create-db-logger");
+        auto logger = spdlog::stdout_color_mt("create-db-logger"); // NOLINT
         const std::filesystem::path sqliteFile{"testFile.sqlite3"};
         if (std::filesystem::exists(sqliteFile)){std::filesystem::remove(sqliteFile);}
         UFP::Database db{logger, sqliteFile, UFP::Database::Mode::Create};
@@ -48,6 +79,7 @@ TEST_CASE("UFilterPickerProxy", "[Database]")
         const std::string algorithmVersion{"0.1.0"};
         const std::string algorithmTag{"322389ds"};
         const std::chrono::seconds pickTime{1777408746};
+        const auto phaseHint{UFilterPickerProxyAPI::V1::PhaseHint::PHASE_HINT_P};
         UFilterPickerProxyAPI::V1::StreamIdentifier identifier;
         identifier.set_network(network);
         identifier.set_station(station);
@@ -63,11 +95,16 @@ TEST_CASE("UFilterPickerProxy", "[Database]")
         *pick.mutable_stream_identifier() = identifier;
         *pick.mutable_algorithm() = algorithm;
         *pick.mutable_time() = google::protobuf::util::TimeUtil::SecondsToTimestamp(pickTime.count());
+        pick.set_phase_hint(phaseHint);
 
         REQUIRE_NOTHROW(db.add(pick));
         REQUIRE_THROWS_AS(db.add(pick), UFilterPickerProxy::DuplicatePickException);
          
-
+        auto allPicks = db.getAllPicks();
+        REQUIRE(allPicks.size() == 1);
+        REQUIRE(::comparePicks(allPicks.at(0), pick) == true);
+        REQUIRE(db.deletePicksBefore(pickTime + std::chrono::seconds {0}) == 0);
+        REQUIRE(db.deletePicksBefore(pickTime + std::chrono::seconds {1}) == 1);
     }
     
 }

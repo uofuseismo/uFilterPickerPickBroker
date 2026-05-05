@@ -41,7 +41,10 @@ public:
     [[nodiscard]] std::vector<UFilterPickerProxyAPI::V1::Pick> getAllPicks() const;
     /// @result The picks in the database whose time exceeds the given value.
     [[nodiscard]] std::vector<UFilterPickerProxyAPI::V1::Pick> getPicksSince(
-        const std::chrono::microseconds &startTime) const;
+        const std::chrono::nanoseconds &startTime) const;
+    /// @brief Deletes picks before a given time.
+    /// @result The number of picks deleted.
+    [[nodiscard]] int deletePicksBefore(const std::chrono::nanoseconds &endTime);
     /// @brief Destructor.
     ~Database();
 
