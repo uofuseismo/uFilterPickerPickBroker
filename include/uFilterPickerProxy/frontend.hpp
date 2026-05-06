@@ -29,6 +29,11 @@ public:
              const std::function<void (UFilterPickerProxyAPI::V1::Pick &&)> &callback,
              std::shared_ptr<spdlog::logger> logger);
 
+    /// @brief Starts the frontend's pick acquisition.
+    void start();
+    /// @brief Stops the frontend and prevents the reading of picks.
+    void stop();
+
     /// @brief Destructor.
     ~Frontend();
     Frontend() = delete;

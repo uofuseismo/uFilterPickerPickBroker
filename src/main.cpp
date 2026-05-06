@@ -10,6 +10,9 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include "uFilterPickerProxy/proxy.hpp"
+#include "uFilterPickerProxy/proxyOptions.hpp"
+#include "uFilterPickerProxy/metricsSingleton.hpp"
 
 namespace
 {
@@ -53,6 +56,7 @@ public:
         {
             mIsRunning = false;
         }
+        if (mProxy){mProxy->stop();}
     }
 
     /// Main thread can print a summary of processing to logs.
@@ -109,7 +113,6 @@ public:
         mSignalStatus = signal;
         mInterrupted = true;
     }
-
     
     /// Destructor.
     ~Process()
@@ -118,6 +121,7 @@ public:
     }
 //private:
     std::shared_ptr<spdlog::logger> mLogger{nullptr};
+    std::unique_ptr<UFilterPickerProxy::Proxy> mProxy{nullptr};
     mutable std::mutex mStopMutex;
     std::condition_variable mStopCondition;
     bool mStopRequested{false};
@@ -126,5 +130,7 @@ public:
 
 int main(int argc, char *argv[])
 {
+    UFilterPickerProxy::initializeMetricsSingleton();
+
     return EXIT_SUCCESS;
 }

@@ -45,6 +45,10 @@ public:
     /// @brief Deletes picks before a given time.
     /// @result The number of picks deleted.
     [[nodiscard]] int deletePicksBefore(const std::chrono::nanoseconds &endTime);
+
+    /// @brief Close the database.
+    void close();
+
     /// @brief Destructor.
     ~Database();
 

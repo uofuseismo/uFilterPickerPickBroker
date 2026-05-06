@@ -82,6 +82,8 @@ set(LIBRARY_SRC
     src/frontend.cpp
     src/frontendOptions.cpp
     src/grpcServerOptions.cpp
+    src/metricsSingleton.cpp
+    src/proxy.cpp
     src/proxyOptions.cpp
     src/version.cpp)
 set(PROTO_SRC
@@ -99,6 +101,7 @@ set(LIBRARY_HEADER_FILES
     include/uFilterPickerProxy/grpcServerOptions.hpp
     include/uFilterPickerProxy/frontend.hpp
     include/uFilterPickerProxy/frontendOptions.hpp
+    include/uFilterPickerProxy/metricsSingleton.hpp
     include/uFilterPickerProxy/proxyOptions.hpp
     include/uFilterPickerProxy/version.hpp)
 

@@ -178,5 +178,17 @@ Frontend::Frontend(
 {
 }
 
+/// Start the frontend acquisition
+void Frontend::start()
+{
+    pImpl->start();
+}
+
+/// Stop the frontend
+void Frontend::stop()
+{
+    pImpl->stop();
+}
+
 /// Destructor
 Frontend::~Frontend() = default;

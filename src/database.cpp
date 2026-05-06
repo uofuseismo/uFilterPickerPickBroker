@@ -1078,5 +1078,11 @@ int Database::deletePicksBefore(const std::chrono::nanoseconds &endTime)
     return pImpl->deletePicksBefore(endTime);
 }
 
+/// Close the database
+void Database::close()
+{
+    pImpl->close(); 
+}
+
 /// Destructor
 Database::~Database() = default;
