@@ -20,6 +20,9 @@
 #include "uFilterPickerProxy/frontend.hpp"
 #include "uFilterPickerProxy/frontendOptions.hpp"
 #include "uFilterPickerProxy/grpcServerOptions.hpp"
+#include "uFilterPickerProxyAPI/v1/frontend.grpc.pb.h"
+#include "uFilterPickerProxyAPI/v1/pick.pb.h"
+#include "uFilterPickerProxyAPI/v1/publish_response.pb.h"
 
 using namespace UFilterPickerProxy;
 
@@ -57,10 +60,11 @@ class AsyncBidirectionalReader :
 
 }
 
-class Frontend::FrontendImpl
+class Frontend::FrontendImpl : 
+    public UFilterPickerProxyAPI::V1::Frontend::CallbackService 
 {
 public:
-   FrontendImpl
+    FrontendImpl
     (
         const FrontendOptions &options,
         const std::function<void (UFilterPickerProxyAPI::V1::Pick &&)> &callback,
@@ -129,8 +133,7 @@ public:
                                      grpc::SslServerCredentials(sslOptions));
             mSecured = true;
         }
-        SPDLOG_LOGGER_CRITICAL(mLogger, "Uncomment here");
-        //builder.RegisterService(this); // TODO
+        builder.RegisterService(this);
         SPDLOG_LOGGER_INFO(mLogger,
                            "Frontend listening at {}", address);
         mServer = builder.BuildAndStart();
@@ -149,13 +152,11 @@ public:
         mNumberOfPublishers.store(0);
     }
 
-/*
     ~FrontendImpl() override
     {
         stop();
         std::this_thread::sleep_for(std::chrono::milliseconds {25});
     }
-*/
 //private:
     FrontendOptions mOptions;
     std::function<void (UFilterPickerProxyAPI::V1::Pick &&)> mCallback;
@@ -166,7 +167,6 @@ public:
     bool mSecured{false};
 };
 
-/*
 /// Constructor
 Frontend::Frontend(
     const FrontendOptions &options,
@@ -177,7 +177,6 @@ Frontend::Frontend(
                                           std::move(logger)))
 {
 }
-*/
 
 /// Destructor
 Frontend::~Frontend() = default;

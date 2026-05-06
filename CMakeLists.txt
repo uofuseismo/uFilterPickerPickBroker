@@ -76,27 +76,33 @@ configure_file(${CMAKE_SOURCE_DIR}/src/version.hpp.in
                ${CMAKE_SOURCE_DIR}/include/uFilterPickerProxy/version.hpp)
 
 set(LIBRARY_SRC
+    src/backendOptions.cpp
     src/database.cpp
+    src/exception.cpp
     src/frontend.cpp
     src/frontendOptions.cpp
     src/grpcServerOptions.cpp
-    src/exception.cpp
+    src/proxyOptions.cpp
     src/version.cpp)
-set(IMPORT_PROTO_SRC
+set(PROTO_SRC
     uFilterPickerProxyAPI/v1/stream_identifier.proto
     uFilterPickerProxyAPI/v1/phase_hint.proto
     uFilterPickerProxyAPI/v1/pick.proto
     uFilterPickerProxyAPI/v1/algorithm.proto
+    uFilterPickerProxyAPI/v1/frontend.proto
+    uFilterPickerProxyAPI/v1/publish_response.proto
     )   
 set(LIBRARY_HEADER_FILES 
+    include/uFilterPickerProxy/backendOptions.hpp
     include/uFilterPickerProxy/database.hpp
+    include/uFilterPickerProxy/exception.hpp
     include/uFilterPickerProxy/grpcServerOptions.hpp
     include/uFilterPickerProxy/frontend.hpp
     include/uFilterPickerProxy/frontendOptions.hpp
-    include/uFilterPickerProxy/exception.hpp
+    include/uFilterPickerProxy/proxyOptions.hpp
     include/uFilterPickerProxy/version.hpp)
 
-add_library(libuFilterPickerProxy STATIC ${LIBRARY_SRC} ${IMPORT_PROTO_SRC})
+add_library(libuFilterPickerProxy STATIC ${LIBRARY_SRC} ${PROTO_SRC})
 add_library(uFilterPickerProxy::libuFilterPickerProxy ALIAS libuFilterPickerProxy)
 set_target_properties(libuFilterPickerProxy PROPERTIES
                       OUTPUT_NAME uFilterPickerProxy

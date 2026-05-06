@@ -12,6 +12,7 @@ class FrontendOptions::FrontendOptionsImpl
 public:
     GRPCServerOptions mGRPCOptions;
     int mMaximumPublishers{2048};
+    int mMaximumConsecutiveInvalidMessages{8};
     std::optional<int> mMaximumMessageSizeInBytes{std::nullopt};
     bool mHasGRPCOptions{false};
 };
