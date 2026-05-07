@@ -80,6 +80,7 @@ jobs:
         uses: ./.github/actions/upload-build-directory
 
   test:
+    needs: build
     runs-on: ${{ matrix.distro }}
     strategy:
       fail-fast: false
