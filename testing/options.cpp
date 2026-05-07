@@ -1,4 +1,3 @@
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <optional>
@@ -6,6 +5,7 @@
 #include "uFilterPickerProxy/grpcServerOptions.hpp"
 #include "uFilterPickerProxy/frontendOptions.hpp"
 #include "uFilterPickerProxy/backendOptions.hpp"
+#include "uFilterPickerProxy/proxyOptions.hpp"
 
 TEST_CASE("UFilterPickerProxy", "[grpcServerOptions]")
 {
@@ -91,14 +91,14 @@ TEST_CASE("UFilterPickerProxy", "[FrontendOptions]")
 
 TEST_CASE("UFilterPickerProxy", "[BackendOptions]")
 {
-    SECTION("BEDefaults")
+    SECTION("Defaults")
     {
         const UFilterPickerProxy::BackendOptions options;
         REQUIRE(options.getMaximumNumberOfSubscribers() == 64);
         REQUIRE(options.hasGRPCOptions() == false);
     }
 
-    SECTION("BEOptions")
+    SECTION("Options")
     {
         const std::string host{"another.host.org"};
         constexpr uint16_t port{6432};
@@ -116,5 +116,43 @@ TEST_CASE("UFilterPickerProxy", "[BackendOptions]")
         REQUIRE(copy.getGRPCOptions().getHost() == host);
         REQUIRE(copy.getGRPCOptions().getPort() == port);
         REQUIRE(copy.getMaximumNumberOfSubscribers() == maxSubscribers);
+    }
+}
+
+TEST_CASE("UFilterPickerProxy", "[ProxyOptions]")
+{
+    SECTION("Defaults")
+    {
+        const UFilterPickerProxy::ProxyOptions options;
+        REQUIRE(options.hasFrontendOptions() == false);
+        REQUIRE(options.hasBackendOptions() == false);
+    }
+
+    SECTION("Options")
+    {
+        const std::string host{"this.host.org"};
+        constexpr uint16_t fePort{6432};
+        constexpr uint16_t bePort{6433};
+        UFilterPickerProxy::GRPCServerOptions grpcFEOptions;  
+        grpcFEOptions.setHost(host);
+        grpcFEOptions.setPort(fePort);
+
+        UFilterPickerProxy::GRPCServerOptions grpcBEOptions;  
+        grpcBEOptions.setHost(host);
+        grpcBEOptions.setPort(bePort);
+
+        UFilterPickerProxy::FrontendOptions feOptions;
+        feOptions.setGRPCOptions(grpcFEOptions);
+
+        UFilterPickerProxy::BackendOptions beOptions;
+        beOptions.setGRPCOptions(grpcBEOptions);
+
+        UFilterPickerProxy::ProxyOptions options;
+        REQUIRE_NOTHROW(options.setFrontendOptions(feOptions));
+        REQUIRE_NOTHROW(options.setBackendOptions(beOptions));
+
+        REQUIRE(options.getFrontendOptions().getGRPCOptions().getPort() == fePort);
+        REQUIRE(options.getBackendOptions().getGRPCOptions().getPort() == bePort);
+
     }
 }

@@ -1,8 +1,10 @@
 #include <memory>
 #include <utility>
+#include <stdexcept>
 #include "uFilterPickerProxy/proxyOptions.hpp"
 #include "uFilterPickerProxy/frontendOptions.hpp"
 #include "uFilterPickerProxy/backendOptions.hpp"
+#include "uFilterPickerProxy/grpcServerOptions.hpp"
 
 using namespace UFilterPickerProxy;
 
@@ -55,6 +57,15 @@ ProxyOptions::~ProxyOptions() = default;
 /// Frontend options
 void ProxyOptions::setFrontendOptions(const FrontendOptions &options)
 {
+    if (hasBackendOptions())
+    {
+        const auto thisPort = options.getGRPCOptions().getPort(); 
+        const auto grpcBEPort = getBackendOptions().getGRPCOptions().getPort();
+        if (thisPort == grpcBEPort)
+        {
+            throw std::invalid_argument("Cannot bind frontend to backend port");
+        }
+    }
     pImpl->mFrontendOptions = options;
     pImpl->mHasFrontendOptions = true;
 }
@@ -76,6 +87,15 @@ bool ProxyOptions::hasFrontendOptions() const noexcept
 /// Backend options
 void ProxyOptions::setBackendOptions(const BackendOptions &options)
 {
+    if (hasFrontendOptions())
+    {
+        const auto thisPort = options.getGRPCOptions().getPort(); 
+        const auto grpcFEPort = getFrontendOptions().getGRPCOptions().getPort();
+        if (thisPort == grpcFEPort)
+        {
+            throw std::invalid_argument("Cannot bind backend to frontend port");
+        }
+    }    
     pImpl->mBackendOptions = options;
     pImpl->mHasBackendOptions = true;
 }

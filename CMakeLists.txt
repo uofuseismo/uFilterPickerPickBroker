@@ -217,7 +217,7 @@ target_link_libraries(uFilterPickerProxy
 if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
    add_executable(unitTests
                   testing/database.cpp
-                  testing/grpcOptions.cpp
+                  testing/options.cpp
    #               testing/utilities.cpp
    #               testing/picker.cpp
    #               testing/grpc.cpp
