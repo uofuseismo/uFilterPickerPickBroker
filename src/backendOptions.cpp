@@ -1,5 +1,6 @@
 #include <memory>
 #include <utility>
+#include <stdexcept>
 #include "uFilterPickerProxy/backendOptions.hpp"
 #include "uFilterPickerProxy/grpcServerOptions.hpp"
 
@@ -9,7 +10,8 @@ class BackendOptions::BackendOptionsImpl
 {
 public:
     GRPCServerOptions mGRPCOptions;
-    bool mHaveGRPCOptions{false};
+    int mMaximumNumberOfSubscribers{64};
+    bool mHasGRPCOptions{false};
 };
 
 /// Constructor
@@ -48,3 +50,37 @@ BackendOptions &BackendOptions::operator=(BackendOptions &&options) noexcept
 
 /// Destructor
 BackendOptions::~BackendOptions() = default;
+
+/// GRPC options
+void BackendOptions::setGRPCOptions(const GRPCServerOptions &options)
+{
+    pImpl->mGRPCOptions = options;
+    pImpl->mHasGRPCOptions = true;
+}
+
+GRPCServerOptions BackendOptions::getGRPCOptions() const
+{
+    if (!hasGRPCOptions()){throw std::runtime_error("gRPC options not set");}
+    return pImpl->mGRPCOptions;
+}
+
+bool BackendOptions::hasGRPCOptions() const noexcept
+{
+    return pImpl->mHasGRPCOptions;
+}
+
+/// Max number of subscribers
+void BackendOptions::setMaximumNumberOfSubscribers(const int maxSubscribers)
+{
+    if (maxSubscribers < 1)
+    {
+        throw std::invalid_argument(
+            "Maximum number of subscribers must be postiive");
+    }
+    pImpl->mMaximumNumberOfSubscribers = maxSubscribers;
+}
+
+int BackendOptions::getMaximumNumberOfSubscribers() const noexcept
+{
+    return pImpl->mMaximumNumberOfSubscribers; 
+}

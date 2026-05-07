@@ -45,6 +45,14 @@ public:
     /// @result The maximum number of publishers.
     [[nodiscard]] std::optional<int> getMaximumMessageSizeInBytes() const noexcept;
 
+    /// @brief Sets the maximum number of consecutive invalid messages before
+    ///        the client is bounced with a 400 error.
+    void setMaximumConsecutiveInvalidMessages(uint32_t maxConsecutiveInvalidMessages) noexcept;
+    /// @result After submitting this many invalid messages consecutively
+    ///         the client is purged.
+    /// @note By default this is 8.
+    [[nodiscard]] uint32_t getMaximumConsecutiveInvalidMessages() const noexcept;
+
     /// @brief Destructor.
     ~FrontendOptions();
     /// @brief Copy assignment.

@@ -30,6 +30,18 @@ public:
     /// @result The number of invalid picks received.
     [[nodiscard]] int64_t getInvalidPicksReceivedCount() const noexcept;
 
+    /// @brief Updates the frontend utilization.
+    /// @param[in] utilization  This utilization in the range of [0, 1].
+    void updateFrontendUtilization(double utilization);
+    /// @result The frontend utilization.  To convert this to a percent multiply by 100.
+    [[nodiscard]] double getFrontendUtilization() const noexcept;
+
+    /// @brief Updates the backend utilization.
+    /// @param[in] utilization  This utilization in the range of [0, 1].
+    void updateBackendUtilization(double utilization);
+    /// @result The frontend utilization.  To convert this to a percent multiply by 100.
+    [[nodiscard]] double getBackendUtilization() const noexcept;
+
     /// @brief Resets the counters and clears maps.  This is useful for unit tests.
     void resetCounters();
 private:
@@ -38,6 +50,8 @@ private:
     std::atomic<int64_t> mOverflowInputPicksCounter{0};
     std::atomic<int64_t> mPicksReceivedCounter{0};
     std::atomic<int64_t> mInvalidPicksReceivedCounter{0};
+    std::atomic<double> mFrontendUtilization{0};
+    std::atomic<double> mBackendUtilization{0};
 };
 
 /// @brief Convenience function to instantiate the metrics singleton once at the

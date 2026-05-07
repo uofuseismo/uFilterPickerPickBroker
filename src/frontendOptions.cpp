@@ -1,6 +1,7 @@
 #include <memory>
 #include <utility>
 #include <stdexcept>
+#include <cstdint>
 #include <optional>
 #include "uFilterPickerProxy/frontendOptions.hpp"
 #include "uFilterPickerProxy/grpcServerOptions.hpp"
@@ -12,7 +13,7 @@ class FrontendOptions::FrontendOptionsImpl
 public:
     GRPCServerOptions mGRPCOptions;
     int mMaximumPublishers{2048};
-    int mMaximumConsecutiveInvalidMessages{8};
+    uint32_t mMaximumConsecutiveInvalidMessages{8};
     std::optional<int> mMaximumMessageSizeInBytes{std::nullopt};
     bool mHasGRPCOptions{false};
 };
@@ -105,4 +106,16 @@ std::optional<int>
     FrontendOptions::getMaximumMessageSizeInBytes() const noexcept
 {
     return pImpl->mMaximumMessageSizeInBytes;
+}
+
+/// Consecutive invalid messages
+void FrontendOptions::setMaximumConsecutiveInvalidMessages(
+    const uint32_t maxInvalidMessages) noexcept
+{
+    pImpl->mMaximumConsecutiveInvalidMessages = maxInvalidMessages;
+}
+
+uint32_t FrontendOptions::getMaximumConsecutiveInvalidMessages() const noexcept
+{
+    return pImpl->mMaximumConsecutiveInvalidMessages;
 }

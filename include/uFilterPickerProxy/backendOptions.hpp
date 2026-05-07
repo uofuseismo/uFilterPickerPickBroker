@@ -17,6 +17,21 @@ public:
     /// @brief Move constructor.
     BackendOptions(BackendOptions &&options) noexcept;
 
+    /// @brief Sets the gRPC server options.
+    /// @param[in] options  The gRPC server options.
+    void setGRPCOptions(const GRPCServerOptions &options);
+    /// @result The gRPC server options.
+    /// @throws std::runtime_error if \c hasGRPCOptions() is false.
+    [[nodiscard]] GRPCServerOptions getGRPCOptions() const;
+    /// @result True indicates the gRPC options were set.
+    [[nodiscard]] bool hasGRPCOptions() const noexcept;
+    
+    /// @param[in] maxSubscribers  The maximum number of subscribers.
+    void setMaximumNumberOfSubscribers(const int maxSubscribers);
+    /// @result The maximum number of subscribers.
+    /// @note By default this is 64.
+    [[nodiscard]] int getMaximumNumberOfSubscribers() const noexcept;
+
     /// @brief Destructor.
     ~BackendOptions();
     /// @brief Copy assignment.

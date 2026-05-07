@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <atomic>
 #include <mutex>
+#include <algorithm>
 #include "uFilterPickerProxy/metricsSingleton.hpp"
 
 using namespace UFilterPickerProxy;
@@ -19,6 +20,8 @@ void MetricsSingleton::resetCounters()
     mOverflowInputPicksCounter.store(0, std::memory_order_relaxed);
     mPicksReceivedCounter.store(0, std::memory_order_relaxed);
     mInvalidPicksReceivedCounter.store(0, std::memory_order_relaxed);
+    mFrontendUtilization.store(0, std::memory_order_relaxed);
+    mBackendUtilization.store(0, std::memory_order_relaxed);
 }
 
 void MetricsSingleton::incrementOverflowInputPicksCounter()
@@ -54,7 +57,20 @@ int64_t MetricsSingleton::getInvalidPicksReceivedCount() const noexcept
     return mInvalidPicksReceivedCounter.load(std::memory_order_relaxed);
 }
 
+void MetricsSingleton::updateFrontendUtilization(const double utilization)
+{
+    mFrontendUtilization.store(std::min(std::max(0.0, utilization), 1.0),
+                               std::memory_order_relaxed);
+}
+
+void MetricsSingleton::updateBackendUtilization(const double utilization)
+{
+    mBackendUtilization.store(std::min(std::max(0.0, utilization), 1.0),
+                              std::memory_order_relaxed);
+}
+
 void UFilterPickerProxy::initializeMetricsSingleton()
 {
     MetricsSingleton::getInstance();
 }
+
