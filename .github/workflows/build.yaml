@@ -53,6 +53,13 @@ jobs:
           ls ~/.conan2/
           ls ~/.conan2/p
 
+      - name: Create default profile with Ninja generator
+        run: |
+          conan profile detect -f
+          echo "" >> ~/.conan2/profiles/default
+          echo "[conf]" >> ~/.conan2/profiles/default
+          echo "tools.cmake.cmaketoolchain:generator=Ninja" >> ~/.conan2/profiles/default
+
       - name: Prepare environment
         uses: ./.github/actions/prepare-environment
 
