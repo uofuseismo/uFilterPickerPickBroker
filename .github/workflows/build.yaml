@@ -21,10 +21,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        #distro: [ubuntu-24.04, ubuntu-24.04-arm]
         distro: [ubuntu-24.04]
         arch: [x86]
         BUILD_TARGET: [Release]
-    name: Build on ${{ matrix.distro }} ${{ matrix.arch }}
+    name: Build for ${{ matrix.distro }} ${{ matrix.arch }}
 
     steps:
       - uses: actions/checkout@v6
@@ -79,8 +80,13 @@ jobs:
         uses: ./.github/actions/upload-build-directory
 
   test:
-    runs-on: ubuntu-24.04
-    needs: build
+    runs-on: ${{ matrix.distro }}
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [ubuntu-24.04]
+        arch: [x86]
+    name: Test on ${{ matrix.distro }} ${{ matrix.arch }}
 
     steps:
       - uses: actions/checkout@v6
@@ -99,6 +105,7 @@ jobs:
           ctest --preset conan-release --verbose
 
   package:
+    needs: test
     runs-on: ${{ matrix.distro }}
     strategy:
       fail-fast: false
@@ -106,7 +113,7 @@ jobs:
         distro: [ubuntu-24.04]
         arch: [x86]
         BUILD_TARGET: [Release]
-    name: Build on ${{ matrix.distro }} ${{ matrix.arch }}
+    name: Package for ${{ matrix.distro }} ${{ matrix.arch }}
 
     steps:
       - uses: actions/checkout@v6
