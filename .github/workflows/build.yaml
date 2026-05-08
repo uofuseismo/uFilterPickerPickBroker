@@ -1,4 +1,4 @@
-name: uFilterPickerProxy Application
+name: uFilterPickerMessageStore Application
 run-name: Pipeline for branch ${{ github.ref_name }}
 
 on:
@@ -8,9 +8,9 @@ on:
     branches: [main]
 
 env:
-  PROJECT_NAME: uFilterPickerProxy
-  CONTAINER_NAME: ufilterpickerproxy
-  QUAY_DIRECTORY: ufilterpickerproxy
+  PROJECT_NAME: uFilterPickerMessageStore
+  CONTAINER_NAME: ufilterpickermessagestore
+  QUAY_DIRECTORY: ufilterpickermessagestore
   BUILD_TYPE: Release
   CXX: /usr/bin/clang++
   CC: /usr/bin/clang
@@ -143,7 +143,7 @@ jobs:
           echo $QUAY_ROBOT_PASSWORD | buildah login -u $QUAY_ROBOT_USER --password-stdin quay.io
           cd build/Release
           cp artifacts/*tar.gz ./
-          version=$(ls *tar.gz | sed 's/uFilterPickerProxy-//g' | sed 's/-Linux.tar.gz//g')
+          version=$(ls *tar.gz | sed 's/uFilterPickerMessageStore-//g' | sed 's/-Linux.tar.gz//g')
           echo "Will build container version ${version}"
           buildah bud -t ${CONTAINER_NAME}:${version} -t ${CONTAINER_NAME}:latest -f ./Dockerfile.u24
           buildah tag ${CONTAINER_NAME}:${version} quay.io/uuss/${QUAY_DIRECTORY}:${version}

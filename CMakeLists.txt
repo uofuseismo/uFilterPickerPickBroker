@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(uFilterPickerProxy VERSION 0.0.1 LANGUAGES CXX)
+project(uFilterPickerMessageStore VERSION 0.0.1 LANGUAGES CXX)
 enable_testing()
 include(FetchContent)
 
@@ -61,16 +61,16 @@ find_package(Git)
 if (Git_FOUND)
    execute_process(
      COMMAND ${GIT_EXECUTABLE} --no-pager log -n 1 HEAD "--pretty=format:%h"
-     OUTPUT_VARIABLE uFilterPickerProxy_GITTAG
+     OUTPUT_VARIABLE uFilterPickerMessageStore_GITTAG
      RESULT_VARIABLE gitresult
      ERROR_QUIET
      OUTPUT_STRIP_TRAILING_WHITESPACE
    )
    if (gitresult EQUAL 0)
-      message(STATUS "Last Git commit: ${uFilterPickerProxy_GITTAG}")
+      message(STATUS "Last Git commit: ${uFilterPickerMessageStore_GITTAG}")
    endif()
 else()
-   set(uFilterPickerProxy_GITTAG "")
+   set(uFilterPickerMessageStore_GITTAG "")
 endif()
 configure_file(${CMAKE_SOURCE_DIR}/src/version.hpp.in
                ${CMAKE_SOURCE_DIR}/include/uFilterPickerMessageStore/version.hpp)
@@ -109,24 +109,24 @@ set(LIBRARY_HEADER_FILES
     include/uFilterPickerMessageStore/pickStoreOptions.hpp
     include/uFilterPickerMessageStore/version.hpp)
 
-add_library(libuFilterPickerProxy STATIC ${LIBRARY_SRC} ${PROTO_SRC})
-add_library(uFilterPickerProxy::libuFilterPickerProxy ALIAS libuFilterPickerProxy)
-set_target_properties(libuFilterPickerProxy PROPERTIES
-                      OUTPUT_NAME uFilterPickerProxy
+add_library(libuFilterPickerMessageStore STATIC ${LIBRARY_SRC} ${PROTO_SRC})
+add_library(uFilterPickerMessageStore::libuFilterPickerMessageStore ALIAS libuFilterPickerMessageStore)
+set_target_properties(libuFilterPickerMessageStore PROPERTIES
+                      OUTPUT_NAME uFilterPickerMessageStore
                       CXX_STANDARD 23
                       CXX_STANDARD_REQUIRED YES 
                       CXX_EXTENSIONS NO)
-target_include_directories(libuFilterPickerProxy
+target_include_directories(libuFilterPickerMessageStore
                            PUBLIC  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
                            PUBLIC  $<INSTALL_INTERFACE:>)
-target_link_libraries(libuFilterPickerProxy
+target_link_libraries(libuFilterPickerMessageStore
                       PRIVATE protobuf::libprotobuf
                               spdlog::spdlog_header_only
                               gRPC::grpc gRPC::grpc++
                               SQLite3::SQLite3)
-target_sources(libuFilterPickerProxy
+target_sources(libuFilterPickerMessageStore
                PUBLIC FILE_SET HEADERS
                       BASE_DIRS
                          include
@@ -134,11 +134,11 @@ target_sources(libuFilterPickerProxy
                       FILES
                          ${LIBRARY_HEADER_FILES})
 
-protobuf_generate(TARGET libuFilterPickerProxy
+protobuf_generate(TARGET libuFilterPickerMessageStore
                   LANGUAGE cpp 
                   OUT_VAR PROTO_GENERATED_CXX_FILES
                  )
-protobuf_generate(TARGET libuFilterPickerProxy
+protobuf_generate(TARGET libuFilterPickerMessageStore
                   LANGUAGE grpc
                   PLUGIN "protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>"
                   PLUGIN_OPTIONS generate_mock_code=true
@@ -151,21 +151,21 @@ set_source_files_properties(${PROTO_GENERATED_FILES} ${PROTO_GENERATED_CXX_FILES
 )
 
 
-add_executable(uFilterPickerProxy
+add_executable(uFilterPickerMessageStore
                src/main.cpp)
                #uDataPacketServiceAPI/v1/data_type.proto
                #uDataPacketServiceAPI/v1/stream_identifier.proto
                #uDataPacketServiceAPI/v1/packet.proto)
-set_target_properties(uFilterPickerProxy PROPERTIES
+set_target_properties(uFilterPickerMessageStore PROPERTIES
                       CXX_STANDARD 23
                       CXX_STANDARD_REQUIRED YES 
                       CXX_EXTENSIONS NO)
-target_include_directories(uFilterPickerProxy
+target_include_directories(uFilterPickerMessageStore
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
                            PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
 if (${WITH_CONAN})
-   target_link_libraries(uFilterPickerProxy
+   target_link_libraries(uFilterPickerMessageStore
                          PRIVATE opentelemetry-cpp::opentelemetry-cpp
                                  opentelemetry-cpp::proto_grpc
                                  opentelemetry-cpp::exporter_otlp_grpc
@@ -178,18 +178,18 @@ if (${WITH_CONAN})
                                  opentelemetry-cpp::metrics
                                  opentelemetry-cpp::common
                                  opentelemetry-cpp::api)
-   target_compile_definitions(uFilterPickerProxy PRIVATE WITH_OTLP_GRPC)
+   target_compile_definitions(uFilterPickerMessageStore PRIVATE WITH_OTLP_GRPC)
 else()
-   target_link_libraries(uFilterPickerProxy
+   target_link_libraries(uFilterPickerMessageStore
                          PRIVATE opentelemetry-cpp::otlp_http_log_record_exporter
                                  opentelemetry-cpp::otlp_http_metric_exporter)
 endif()
-target_link_libraries(uFilterPickerProxy
-                      PRIVATE uFilterPickerProxy::libuFilterPickerProxy
+target_link_libraries(uFilterPickerMessageStore
+                      PRIVATE uFilterPickerMessageStore::libuFilterPickerMessageStore
                               spdlog::spdlog_header_only
                               protobuf::libprotobuf gRPC::grpc gRPC::grpc++
                               Boost::headers Boost::program_options)
-#target_sources(uFilterPickerProxy
+#target_sources(uFilterPickerMessageStore
 #               #PUBLIC FILE_SET HEADERS
 #               #       BASE_DIRS
 #               #          ${CMAKE_CURRENT_SOURCE_DIR}
@@ -204,11 +204,11 @@ target_link_libraries(uFilterPickerProxy
 #                         src/modules/filterPickerOptions.cppm
 #                         src/modules/metrics.cppm
 #                         src/modules/otelSpdlogSink.cppm)
-#protobuf_generate(TARGET uFilterPickerProxy
+#protobuf_generate(TARGET uFilterPickerMessageStore
 #                  LANGUAGE cpp
 #                  OUT_VAR PROTO_GENERATED_CXX_FILES
 #                 )
-#protobuf_generate(TARGET uFilterPickerProxy
+#protobuf_generate(TARGET uFilterPickerMessageStore
 #                  LANGUAGE grpc
 #                  PLUGIN "protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>"
 #                  PLUGIN_OPTIONS generate_mock_code=true
@@ -235,7 +235,7 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
                          CXX_EXTENSIONS NO) 
    target_link_libraries(unitTests
                          PRIVATE 
-                            uFilterPickerProxy::libuFilterPickerProxy
+                            uFilterPickerMessageStore::libuFilterPickerMessageStore
                             spdlog::spdlog_header_only
                             gRPC::grpc gRPC::grpc++
                             Threads::Threads
@@ -270,7 +270,7 @@ write_basic_package_version_file(
     COMPATIBILITY AnyNewerVersion
 )
 
-install(TARGETS libuFilterPickerProxy
+install(TARGETS libuFilterPickerMessageStore
         EXPORT ${PROJECT_NAME}Targets
         FILE_SET HEADERS
         #DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
@@ -279,7 +279,7 @@ install(TARGETS libuFilterPickerProxy
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         COMPONENT libraries)
-install(TARGETS uFilterPickerProxy
+install(TARGETS uFilterPickerMessageStore
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         COMPONENT applications)
 install(EXPORT ${PROJECT_NAME}Targets
@@ -303,7 +303,7 @@ if (${BUILD_CONTAINER})
                      COMMENT "Creating container file for ${PROJECT_NAME}"
                      COMMAND ${CMAKE_CPACK_COMMAND} -G DEB 
                      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} VERBATIM)
-   add_dependencies(${PROJECT_NAME}-u24 uFilterPickerProxy libuFilterPickerProxy)
+   add_dependencies(${PROJECT_NAME}-u24 uFilterPickerMessageStore libuFilterPickerMessageStore)
    find_program(buildah_EXECUTABLE buildah)
    if (buildah_EXECUTABLE)
       add_custom_target(buildah
@@ -321,7 +321,7 @@ set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
 set(CPACK_PACKAGE_VENDOR "UUSS")
 set(CPACK_PACKAGE_CONTACT "ben.baker@utah.edu")
 set(CPACK_PACKAGE_LICENSE "MIT")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A stateful proxy to which instances of the uFilterPicker can submit their picks in the UUSS Kubernetes environment.")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A message store built atop a durable pub-sub to which instances of the uFilterPicker can submit their picks in the UUSS Kubernetes environment.")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY ${CPACK_PACKAGE_NAME})
 set(CPACK_VERBATIM_VARIABLES YES)
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
@@ -331,17 +331,17 @@ set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 if (${BUILD_SHARED_LIBS})
    cpack_add_component(libraries
-                       DISPLAY_NAME "uFilterPickerProxy common libraries"
+                       DISPLAY_NAME "uFilterPickerMessageStore common libraries"
                        DEPENDS ${GRPC_LIBRARY} ${GRPC_GRPC++_LIBRARY})
 else()
    cpack_add_component(libraries
-                       DISPLAY_NAME "uFilterPickerProxy common libraries")
+                       DISPLAY_NAME "uFilterPickerMessageStore common libraries")
 endif()
 cpack_add_component(headers
-                    DISPLAY_NAME "uFilterPickerProxy library header files"
+                    DISPLAY_NAME "uFilterPickerMessageStore library header files"
                     DEPENDS libraries)
 cpack_add_component(applications
-                    DISPLAY_NAME "uFilterPickerProxy applications"
+                    DISPLAY_NAME "uFilterPickerMessageStore applications"
                     DEPENDS libraries)
 set(CPACK_GENERATOR ZIP TGZ)
 if (WIN32)
