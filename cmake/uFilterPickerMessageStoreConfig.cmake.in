@@ -1,0 +1,20 @@
+#.rst
+# FinduFilterPickerMessageStore
+# -----------------------------
+#
+# Finds the UUSS filter picker message store library.
+#
+# Imported Targets
+# ^^^^^^^^^^^^^^^^
+#
+# ``uFilterPickerMessageStore_FOUND``
+#   True indicates uFilterPickerMessageStore was found.
+# ``uFilterPickerMessageStore::uFilterPickerMessageStore``
+#   The filter picker message store library, if found.
+include(CMakeFindDependencyMacro)
+
+find_dependency(TBB)
+
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
