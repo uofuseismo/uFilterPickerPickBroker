@@ -1,0 +1,20 @@
+edition = "2023";
+
+package UFilterPickerMessageStoreAPI.V1;
+
+/*!
+ * Summarizes the send statistics of publishers.  Receipt of this message
+ * concludes a publish event.
+ */
+message PublishResponse {
+    /// The total number of picks submitted to the frontend.
+    uint64 total_picks = 1;
+    /// The number of picks rejected.  Note, the number of accepted picks
+    /// is total_picks - picks_rejected.
+    uint64 picks_rejected = 2;
+    /// The total number of duplicate picks.  These picks were rejected 
+    /// because another module already sent this information.
+    /// In this case, the total number of invalid picks is 
+    /// picks_rejected - duplicate_picks.
+    uint64 duplicate_picks = 3;
+};

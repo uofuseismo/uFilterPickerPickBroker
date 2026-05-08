@@ -1,0 +1,16 @@
+edition = "2023";
+import "google/protobuf/timestamp.proto";
+
+package UFilterPickerMessageStoreAPI.V1;
+
+import "uFilterPickerMessageStoreAPI/v1/stream_identifier.proto";
+import "uFilterPickerMessageStoreAPI/v1/phase_hint.proto";
+import "uFilterPickerMessageStoreAPI/v1/algorithm.proto";
+
+
+message Pick {
+    StreamIdentifier stream_identifier = 1; /// Defines the stream on which the pick was made.
+    google.protobuf.Timestamp time = 2; /// The time (UTC) of the pick.
+    PhaseHint phase_hint = 3 [default = PHASE_HINT_UNKNOWN]; /// The phase hint.
+    Algorithm algorithm = 4; /// The algorithm (version) that generated this pick.
+}

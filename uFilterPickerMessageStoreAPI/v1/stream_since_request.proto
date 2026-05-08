@@ -1,0 +1,12 @@
+edition = "2023";
+import "google/protobuf/duration.proto";
+
+package UFilterPickerMessageStoreAPI.V1;
+
+/*!
+ * Requests picks from the message store beginning a certain amount of time into the past.
+ */
+message StreamSinceRequest {
+    string identifier = 1 [default = ""]; /// A request identifier.
+    google.protobuf.Duration backfill_duration = 2; /// If the consumer or proxy drops out this allows for a pick backfill operation.
+}

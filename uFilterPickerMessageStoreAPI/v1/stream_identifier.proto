@@ -1,0 +1,14 @@
+edition = "2023";
+
+package UFilterPickerMessageStoreAPI.V1;
+
+/*!
+ * A data stream identification on which the pick was made.  The identifier
+ * consists of a network code, staiton name, channel code, and location code.
+ */
+message StreamIdentifier {
+    string network = 1; /// The network code - e.g., UU.
+    string station = 2; /// The station code - e.g., FORK.
+    string channel = 3; /// The channel code - e.g., HHZ.
+    string location_code = 4 [default = "--"]; /// The location code - e.g., 01
+}

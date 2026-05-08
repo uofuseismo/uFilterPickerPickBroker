@@ -1,0 +1,12 @@
+edition = "2023";
+
+package UFilterPickerMessageStoreAPI.V1;
+
+/*!
+ * Defines the underlying data type when interpreting data.
+ */
+enum PhaseHint {
+    PHASE_HINT_UNKNOWN = 0;   /*! The phase is unknown. */
+    PHASE_HINT_P = 1;         /*! The pick corresponds to a P-phase.  */
+    PHASE_HINT_S = 2;         /*! The pick corresponds to an S-phase.  */
+}

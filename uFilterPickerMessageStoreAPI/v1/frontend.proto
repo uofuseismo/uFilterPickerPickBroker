@@ -1,0 +1,18 @@
+edition = "2023";
+
+package UFilterPickerMessageStoreAPI.V1;
+
+import "uFilterPickerMessageStoreAPI/v1/pick.proto";
+import "uFilterPickerMessageStoreAPI/v1/publish_response.proto";
+
+/*!
+ * Modules running the uFilterPicker send their picks to the (proxy)
+ * frontend.
+ */
+service Frontend {
+    /*! 
+     * The producer sends its picks to this end point.
+     * When finished returns of summary of picks sent.
+     */
+    rpc Publish(stream Pick) returns(PublishResponse) {}; 
+}

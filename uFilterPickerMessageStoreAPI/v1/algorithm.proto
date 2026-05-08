@@ -1,0 +1,9 @@
+edition = "2023";
+package UFilterPickerMessageStoreAPI.V1;
+
+message Algorithm {
+    string name = 1 [default = "uFilterPicker"]; /// The algorithm (version) that generated this pick.
+    string version = 2; /// The uFilterPicker version (MAJOR.MINOR.PATCH).
+    string tag = 3 [default = ""]; /// The git tag.
+}
+
