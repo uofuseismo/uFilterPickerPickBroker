@@ -17,10 +17,10 @@
 #include <google/protobuf/util/time_util.h>
 #include "uFilterPickerPickBroker/database.hpp"
 #include "uFilterPickerPickBroker/exception.hpp"
-#include <uFilterPickerMessageStoreAPI/v1/pick.pb.h>
-#include <uFilterPickerMessageStoreAPI/v1/phase_hint.pb.h>
-#include <uFilterPickerMessageStoreAPI/v1/stream_identifier.pb.h>
-#include <uFilterPickerMessageStoreAPI/v1/algorithm.pb.h>
+#include <uFilterPickerPickBrokerAPI/v1/pick.pb.h>
+#include <uFilterPickerPickBrokerAPI/v1/phase_hint.pb.h>
+#include <uFilterPickerPickBrokerAPI/v1/stream_identifier.pb.h>
+#include <uFilterPickerPickBrokerAPI/v1/algorithm.pb.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 //#include <catch2/catch_approx.hpp>
@@ -79,19 +79,19 @@ TEST_CASE("UFilterPickerPickBroker", "[Database]")
         const std::string algorithmVersion{"0.1.0"};
         const std::string algorithmTag{"322389ds"};
         const std::chrono::seconds pickTime{1777408746};
-        const auto phaseHint{UFilterPickerMessageStoreAPI::V1::PhaseHint::PHASE_HINT_P};
-        UFilterPickerMessageStoreAPI::V1::StreamIdentifier identifier;
+        const auto phaseHint{UFilterPickerPickBrokerAPI::V1::PhaseHint::PHASE_HINT_P};
+        UFilterPickerPickBrokerAPI::V1::StreamIdentifier identifier;
         identifier.set_network(network);
         identifier.set_station(station);
         identifier.set_channel(channel);
         identifier.set_location_code(locationCode);
 
-        UFilterPickerMessageStoreAPI::V1::Algorithm algorithm;
+        UFilterPickerPickBrokerAPI::V1::Algorithm algorithm;
         algorithm.set_name(algorithmName);
         algorithm.set_version(algorithmVersion);
         algorithm.set_tag(algorithmTag);
 
-        UFilterPickerMessageStoreAPI::V1::Pick pick;
+        UFilterPickerPickBrokerAPI::V1::Pick pick;
         *pick.mutable_stream_identifier() = identifier;
         *pick.mutable_algorithm() = algorithm;
         *pick.mutable_time() = google::protobuf::util::TimeUtil::SecondsToTimestamp(pickTime.count());

@@ -31,9 +31,9 @@
 #include "uFilterPickerPickBroker/pickStore.hpp"
 #include "uFilterPickerPickBroker/pickStoreOptions.hpp"
 #include "uFilterPickerPickBroker/exception.hpp"
-#include "uFilterPickerMessageStoreAPI/v1/pick.pb.h"
-#include "uFilterPickerMessageStoreAPI/v1/algorithm.pb.h"
-#include "uFilterPickerMessageStoreAPI/v1/stream_identifier.pb.h"
+#include "uFilterPickerPickBrokerAPI/v1/pick.pb.h"
+#include "uFilterPickerPickBrokerAPI/v1/algorithm.pb.h"
+#include "uFilterPickerPickBrokerAPI/v1/stream_identifier.pb.h"
 
 using namespace UFilterPickerPickBroker;
 
@@ -49,10 +49,10 @@ std::string capitalizeAndRemoveBlanks(const std::string &input)
     return result;
 }
 
-UFilterPickerMessageStoreAPI::V1::StreamIdentifier checkAndFixStreamIdentifier(
-    UFilterPickerMessageStoreAPI::V1::StreamIdentifier &&identifierIn)
+UFilterPickerPickBrokerAPI::V1::StreamIdentifier checkAndFixStreamIdentifier(
+    UFilterPickerPickBrokerAPI::V1::StreamIdentifier &&identifierIn)
 {
-    UFilterPickerMessageStoreAPI::V1::StreamIdentifier identifier{std::move(identifierIn)};
+    UFilterPickerPickBrokerAPI::V1::StreamIdentifier identifier{std::move(identifierIn)};
     if (!identifier.has_network())
     {
         throw std::invalid_argument("Network not set");
@@ -96,10 +96,10 @@ UFilterPickerMessageStoreAPI::V1::StreamIdentifier checkAndFixStreamIdentifier(
     return identifier;
 }
 
-UFilterPickerMessageStoreAPI::V1::Algorithm checkAndFixAlgorithm(
-    UFilterPickerMessageStoreAPI::V1::Algorithm &&algorithmIn)
+UFilterPickerPickBrokerAPI::V1::Algorithm checkAndFixAlgorithm(
+    UFilterPickerPickBrokerAPI::V1::Algorithm &&algorithmIn)
 {
-    UFilterPickerMessageStoreAPI::V1::Algorithm algorithm{std::move(algorithmIn)};
+    UFilterPickerPickBrokerAPI::V1::Algorithm algorithm{std::move(algorithmIn)};
     if (!algorithm.has_name())
     {
         algorithm.set_name("uFilterPicker");
@@ -200,7 +200,7 @@ public:
     {
         while (mKeepRunning.load(std::memory_order_relaxed))
         {
-            UFilterPickerMessageStoreAPI::V1::Pick pick;
+            UFilterPickerPickBrokerAPI::V1::Pick pick;
             bool gotPick{false};
             {
             const std::lock_guard lock(mMutex);
@@ -275,7 +275,7 @@ public:
     }
 
     /// @brief Defines the callback for getting/propagating a pick.
-    void addPickCallback(UFilterPickerMessageStoreAPI::V1::Pick &&pick)
+    void addPickCallback(UFilterPickerPickBrokerAPI::V1::Pick &&pick)
     {
         if (!pick.has_stream_identifier())
         {
@@ -327,7 +327,7 @@ private:
     std::unique_ptr<Database> mDatabase{nullptr};
     std::shared_ptr<spdlog::logger> mLogger{nullptr};
     std::mutex mMutex;
-    std::function<void(UFilterPickerMessageStoreAPI::V1::Pick &&)>
+    std::function<void(UFilterPickerPickBrokerAPI::V1::Pick &&)>
         mAddPickCallbackFunction
     {
         std::bind(&BrokerImpl::addPickCallback, this,
@@ -339,7 +339,7 @@ private:
     };
     std::unique_ptr<PublishService> mPublishService{nullptr};
     std::unique_ptr<SubscribeService> mSubscribeService{nullptr};
-    std::queue<UFilterPickerMessageStoreAPI::V1::Pick> mInputQueue;
+    std::queue<UFilterPickerPickBrokerAPI::V1::Pick> mInputQueue;
     size_t mMaximumInputQueueSize{4096};
     std::atomic<bool> mIsRunning{false};
     std::atomic<bool> mKeepRunning{true};

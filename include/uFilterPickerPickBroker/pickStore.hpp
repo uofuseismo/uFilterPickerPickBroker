@@ -9,7 +9,7 @@ namespace UFilterPickerPickBroker
 {
  class PickStoreOptions;
 }
-namespace UFilterPickerMessageStoreAPI::V1
+namespace UFilterPickerPickBrokerAPI::V1
 {
  class Pick;
 }
@@ -28,7 +28,7 @@ public:
     PickStore(const PickStoreOptions &options,
               std::shared_ptr<spdlog::logger> logger);
     PickStore(const PickStoreOptions &options,
-              std::vector<std::pair<std::chrono::nanoseconds, UFilterPickerMessageStoreAPI::V1::Pick>> &backfillPicks,
+              std::vector<std::pair<std::chrono::nanoseconds, UFilterPickerPickBrokerAPI::V1::Pick>> &backfillPicks,
               std::shared_ptr<spdlog::logger> logger);
 
     /// @name Publisher Utilities
@@ -36,7 +36,7 @@ public:
 
     /// @brief Enqueues the next pick for publication to all subscribers.
     /// @param[in,out] pick   The pick to send to subscribers.
-    void enqueue(UFilterPickerMessageStoreAPI::V1::Pick &&pick);
+    void enqueue(UFilterPickerPickBrokerAPI::V1::Pick &&pick);
     /// @}
 
     /// @name Subscriber Utilities
@@ -63,7 +63,7 @@ public:
     /// @brief Fetches the latest pick to publish.
     /// @param contextAddress  The subscribing context address.
     /// @return The latest picks to send to the subscriber.
-    [[nodiscard]] std::vector<UFilterPickerMessageStoreAPI::V1::Pick> getPicks(uintptr_t contextAddress) const;
+    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getPicks(uintptr_t contextAddress) const;
     /// @}
 
     /// @brief  Destructor.

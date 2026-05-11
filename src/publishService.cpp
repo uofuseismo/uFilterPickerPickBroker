@@ -26,9 +26,9 @@
 #include "uFilterPickerPickBroker/publishServiceOptions.hpp"
 #include "uFilterPickerPickBroker/grpcServerOptions.hpp"
 #include "uFilterPickerPickBroker/metricsSingleton.hpp"
-#include "uFilterPickerMessageStoreAPI/v1/frontend.grpc.pb.h"
-#include "uFilterPickerMessageStoreAPI/v1/pick.pb.h"
-#include "uFilterPickerMessageStoreAPI/v1/publish_response.pb.h"
+#include "uFilterPickerPickBrokerAPI/v1/publish_service.grpc.pb.h"
+#include "uFilterPickerPickBrokerAPI/v1/pick.pb.h"
+#include "uFilterPickerPickBrokerAPI/v1/publish_response.pb.h"
 
 using namespace UFilterPickerPickBroker;
 
@@ -55,16 +55,16 @@ bool validatePublisher(const grpc::CallbackServerContext *context,
 
 /// Handles one publisher's client-streaming Publish RPC session.
 class AsynchronousReader :
-    public grpc::ServerReadReactor<UFilterPickerMessageStoreAPI::V1::Pick>
+    public grpc::ServerReadReactor<UFilterPickerPickBrokerAPI::V1::Pick>
 {
 public:
-    using Pick = UFilterPickerMessageStoreAPI::V1::Pick;
-    using PublishResponse = UFilterPickerMessageStoreAPI::V1::PublishResponse;
+    using Pick = UFilterPickerPickBrokerAPI::V1::Pick;
+    using PublishResponse = UFilterPickerPickBrokerAPI::V1::PublishResponse;
 
     AsynchronousReader(
         const PublishServiceOptions &options,
         grpc::CallbackServerContext *context,
-        const std::function<void (UFilterPickerMessageStoreAPI::V1::Pick &&)> &callback,
+        const std::function<void (UFilterPickerPickBrokerAPI::V1::Pick &&)> &callback,
         PublishResponse *response,
         const std::atomic<bool> *keepRunning,
         std::atomic<int> *publisherCount,
@@ -209,12 +209,12 @@ public:
 
 //private:
     grpc::CallbackServerContext *mContext{nullptr};
-    UFilterPickerMessageStoreAPI::V1::PublishResponse *mResponse{nullptr};
-    std::function<void (UFilterPickerMessageStoreAPI::V1::Pick &&)> mCallback;
+    UFilterPickerPickBrokerAPI::V1::PublishResponse *mResponse{nullptr};
+    std::function<void (UFilterPickerPickBrokerAPI::V1::Pick &&)> mCallback;
     const std::atomic<bool> *mKeepRunning{nullptr};
     std::atomic<int> *mPublisherCount{nullptr};
     std::shared_ptr<spdlog::logger> mLogger;
-    UFilterPickerMessageStoreAPI::V1::Pick mCurrentPick;
+    UFilterPickerPickBrokerAPI::V1::Pick mCurrentPick;
     UFilterPickerPickBroker::MetricsSingleton &mMetrics
     {
         UFilterPickerPickBroker::MetricsSingleton::getInstance()
@@ -233,13 +233,13 @@ public:
 }
 
 class PublishService::PublishServiceImpl :
-    public UFilterPickerMessageStoreAPI::V1::Frontend::CallbackService
+    public UFilterPickerPickBrokerAPI::V1::PublishService::CallbackService
 {
 public:
     PublishServiceImpl
     (
         const PublishServiceOptions &options,
-        const std::function<void (UFilterPickerMessageStoreAPI::V1::Pick &&)> &callback,
+        const std::function<void (UFilterPickerPickBrokerAPI::V1::Pick &&)> &callback,
         std::shared_ptr<spdlog::logger> logger
     ) :
         mOptions(options),
@@ -326,9 +326,9 @@ public:
         MetricsSingleton::getInstance().updatePublishServiceUtilization(0);
     }
 
-    grpc::ServerReadReactor<UFilterPickerMessageStoreAPI::V1::Pick>*
+    grpc::ServerReadReactor<UFilterPickerPickBrokerAPI::V1::Pick>*
         Publish(grpc::CallbackServerContext* context,
-                UFilterPickerMessageStoreAPI::V1::PublishResponse *publishResponse) override
+                UFilterPickerPickBrokerAPI::V1::PublishResponse *publishResponse) override
     {
         return new ::AsynchronousReader(
             mOptions,
@@ -348,7 +348,7 @@ public:
     }
 //private:
     PublishServiceOptions mOptions;
-    std::function<void (UFilterPickerMessageStoreAPI::V1::Pick &&)> mCallback;
+    std::function<void (UFilterPickerPickBrokerAPI::V1::Pick &&)> mCallback;
     std::shared_ptr<spdlog::logger> mLogger{nullptr};
     std::unique_ptr<grpc::Server> mServer{nullptr};
     std::atomic<int> mPublisherCount{0};
@@ -359,7 +359,7 @@ public:
 /// Constructor
 PublishService::PublishService(
     const PublishServiceOptions &options,
-    const std::function<void (UFilterPickerMessageStoreAPI::V1::Pick &&)> &callback,
+    const std::function<void (UFilterPickerPickBrokerAPI::V1::Pick &&)> &callback,
     std::shared_ptr<spdlog::logger> logger) :
     pImpl(std::make_unique<PublishServiceImpl> (options,
                                                 callback,

@@ -3,7 +3,7 @@
 #include <spdlog/logger.h>
 #include <memory>
 #include <functional>
-namespace UFilterPickerMessageStoreAPI::V1
+namespace UFilterPickerPickBrokerAPI::V1
 {
  class Pick;
 }
@@ -35,7 +35,7 @@ public:
     void start();
 
     /// @brief Enqueues a pick to be written to consumers.
-    void enqueue(UFilterPickerMessageStoreAPI::V1::Pick &&pick);
+    void enqueue(UFilterPickerPickBrokerAPI::V1::Pick &&pick);
 
     /// @brief Stops the subscribe service and prevents the propagation of picks.
     void stop();

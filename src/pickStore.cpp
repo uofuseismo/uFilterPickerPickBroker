@@ -12,7 +12,7 @@
 #include <mutex>
 #include "uFilterPickerPickBroker/pickStore.hpp"
 #include "uFilterPickerPickBroker/pickStoreOptions.hpp"
-#include "uFilterPickerMessageStoreAPI/v1/pick.pb.h"
+#include "uFilterPickerPickBrokerAPI/v1/pick.pb.h"
 
 using namespace UFilterPickerPickBroker;
 
@@ -47,7 +47,7 @@ public:
         std::lock_guard lock(mMutex);
         if (!mSubscriberPickMap.contains(contextAddress))
         {
-            auto newQueue = std::queue<UFilterPickerMessageStoreAPI::V1::Pick> ();
+            auto newQueue = std::queue<UFilterPickerPickBrokerAPI::V1::Pick> ();
             auto newElement = std::make_pair(contextAddress, std::move(newQueue));
             mSubscriberPickMap.insert( std::move(newElement) );
         }
@@ -65,7 +65,7 @@ public:
     }
 
     void enqueue(const std::chrono::nanoseconds &timeReceived,
-                 UFilterPickerMessageStoreAPI::V1::Pick &&pick)
+                 UFilterPickerPickBrokerAPI::V1::Pick &&pick)
     {
         const auto now
             = std::chrono::high_resolution_clock::now().time_since_epoch();
@@ -102,13 +102,13 @@ public:
 //private:
     PickStoreOptions mOptions;
     std::shared_ptr<spdlog::logger> mLogger{nullptr};
-    std::map<uintptr_t, std::queue<UFilterPickerMessageStoreAPI::V1::Pick>> mSubscriberPickMap;
+    std::map<uintptr_t, std::queue<UFilterPickerPickBrokerAPI::V1::Pick>> mSubscriberPickMap;
     std::deque
     <
         std::pair
         <
             std::chrono::nanoseconds,
-            UFilterPickerMessageStoreAPI::V1::Pick
+            UFilterPickerPickBrokerAPI::V1::Pick
         >
     > mPickDeque;
     std::mutex mMutex;

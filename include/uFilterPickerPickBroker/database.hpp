@@ -5,7 +5,7 @@
 #include <chrono>
 #include <vector>
 #include <spdlog/logger.h>
-namespace UFilterPickerMessageStoreAPI::V1
+namespace UFilterPickerPickBrokerAPI::V1
 {
  class Pick;
 }
@@ -35,16 +35,16 @@ public:
     ///         - i.e., no writing.
     [[nodiscard]] bool isReadOnly() const noexcept;
     /// @brief Add a pick.
-    void add(const UFilterPickerMessageStoreAPI::V1::Pick &pick);
+    void add(const UFilterPickerPickBrokerAPI::V1::Pick &pick);
 
     /// @result All picks currently in the database.
-    [[nodiscard]] std::vector<UFilterPickerMessageStoreAPI::V1::Pick> getAllPicks() const;
+    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getAllPicks() const;
     /// @result The picks in the database whose time exceeds the given value.
-    [[nodiscard]] std::vector<UFilterPickerMessageStoreAPI::V1::Pick> getPicksSince(
+    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getPicksSince(
         const std::chrono::nanoseconds &startTime) const;
     /// @result Gets the most recently submitted picks.
-    [[nodiscard]] std::vector<UFilterPickerMessageStoreAPI::V1::Pick> getMostRecentlySubmittedPicks() const;
-    [[nodiscard]] std::vector<UFilterPickerMessageStoreAPI::V1::Pick> getMostRecentlySubmittedPicks(int limit) const;
+    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getMostRecentlySubmittedPicks() const;
+    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getMostRecentlySubmittedPicks(int limit) const;
     /// @brief Deletes picks before a given time.
     /// @result The number of picks deleted.
     [[nodiscard]] int deletePicksBefore(const std::chrono::nanoseconds &endTime);

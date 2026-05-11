@@ -88,12 +88,12 @@ set(LIBRARY_SRC
     src/pickStoreOptions.cpp
     src/version.cpp)
 set(PROTO_SRC
-    uFilterPickerMessageStoreAPI/v1/stream_identifier.proto
-    uFilterPickerMessageStoreAPI/v1/phase_hint.proto
-    uFilterPickerMessageStoreAPI/v1/pick.proto
-    uFilterPickerMessageStoreAPI/v1/algorithm.proto
-    uFilterPickerMessageStoreAPI/v1/frontend.proto
-    uFilterPickerMessageStoreAPI/v1/publish_response.proto
+    uFilterPickerPickBrokerAPI/v1/stream_identifier.proto
+    uFilterPickerPickBrokerAPI/v1/phase_hint.proto
+    uFilterPickerPickBrokerAPI/v1/pick.proto
+    uFilterPickerPickBrokerAPI/v1/algorithm.proto
+    uFilterPickerPickBrokerAPI/v1/frontend.proto
+    uFilterPickerPickBrokerAPI/v1/publish_response.proto
     )
 set(LIBRARY_HEADER_FILES
     include/uFilterPickerPickBroker/subscribeServiceOptions.hpp
@@ -191,9 +191,9 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
    add_executable(unitTests
                   testing/database.cpp
                   testing/options.cpp
-                  uFilterPickerMessageStoreAPI/v1/stream_identifier.proto
-                  uFilterPickerMessageStoreAPI/v1/phase_hint.proto
-                  uFilterPickerMessageStoreAPI/v1/pick.proto
+                  uFilterPickerPickBrokerAPI/v1/stream_identifier.proto
+                  uFilterPickerPickBrokerAPI/v1/phase_hint.proto
+                  uFilterPickerPickBrokerAPI/v1/pick.proto
    )
    set_target_properties(unitTests PROPERTIES
                          CXX_STANDARD 23
