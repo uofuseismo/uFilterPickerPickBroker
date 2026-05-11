@@ -1,7 +1,7 @@
-# Purpose: Creates the container for running the uFilterPickerMessageStore software in
+# Purpose: Creates the container for running the uFilterPickerPickBroker software in
 #          a Ubuntu container.
-# Usage: podman build -t ufilterpickermessagestore:latest -f Dockerfile.u24
-#        buildah bud -t ufilterpickermessagestore:latest -f Dockerfile.u24
+# Usage: podman build -t ufilterpickerpickbroker:latest -f Dockerfile.u24
+#        buildah bud -t ufilterpickerpickbroker:latest -f Dockerfile.u24
 FROM ubuntu:24.04
 COPY @PROJECT_NAME@-@PROJECT_VERSION@-Linux.tar.gz .
 LABEL version="@PROJECT_VERSION@"
@@ -14,7 +14,7 @@ RUN apt-get update &&\
     apt-get autoremove -y &&\
     apt-get clean &&\
     tar -xf ./@PROJECT_NAME@-@PROJECT_VERSION@-Linux.tar.gz &&\
-    mv ./@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uFilterPickerMessageStore /usr/local/bin &&\
+    mv ./@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uFilterPickerPickBroker /usr/local/bin &&\
     rm -r ./@PROJECT_NAME@-@PROJECT_VERSION@-Linux/ &&\
     rm -r /var/lib/apt/lists/* ./@PROJECT_NAME@-@PROJECT_VERSION@-Linux.tar.gz
 
