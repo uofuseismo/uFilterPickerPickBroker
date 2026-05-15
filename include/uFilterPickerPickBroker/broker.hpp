@@ -27,6 +27,9 @@ public:
            std::unique_ptr<Database> &&database,
            std::shared_ptr<spdlog::logger> logger);
 
+    /// @result True indicates the broker is initialized.
+    [[nodiscard]] bool isInitialized() const noexcept;
+
     /// @brief Starts the broker.
     std::future<void> start();
 

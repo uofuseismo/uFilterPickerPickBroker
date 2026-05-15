@@ -17,6 +17,7 @@
 #include "uFilterPickerPickBroker/subscribeServiceOptions.hpp"
 #include "uFilterPickerPickBroker/publishServiceOptions.hpp"
 #include "uFilterPickerPickBroker/grpcServerOptions.hpp"
+#include "uFilterPickerPickBroker/database.hpp"
 #include "otelOptions.hpp"
 
 namespace
@@ -32,11 +33,13 @@ struct ProgramOptions
     UFilterPickerPickBroker::OTelOptions::GRPCMetrics otelGRPCMetricsOptions;
     UFilterPickerPickBroker::OTelOptions::GRPCLog otelGRPCLogOptions;
     std::string applicationName{APPLICATION_NAME};
+    std::filesystem::path sqlite3File{"uFilterPickerMessageStore.sqlite3"};
     int verbosity{3};
     bool exportLogs{false};
     bool exportLogsWithHTTP{true};
     bool exportMetrics{false};
     bool exportMetricsWithHTTP{true};
+    bool deleteDatabaseIfExists{false};
 };
 
 std::pair<std::filesystem::path, bool>
@@ -313,6 +316,20 @@ ProgramOptions parseIniFile(const std::filesystem::path &iniFile)
     }   
     options.verbosity
         = propertyTree.get<int> ("General.verbosity", options.verbosity);
+
+    // Database
+    auto sqlite3FileName = std::string {options.sqlite3File};
+    sqlite3FileName
+        = propertyTree.get<std::string> ("Database.sqlite3File",
+                                         sqlite3FileName);
+    options.sqlite3File = std::filesystem::path {sqlite3FileName};
+    if (options.sqlite3File.empty())
+    {
+        throw std::invalid_argument("sqlite3 file is empty");
+    }
+    options.deleteDatabaseIfExists
+        = propertyTree.get<bool> ("Database.deleteIfExists", 
+                                  options.deleteDatabaseIfExists);
 
     // Logging
     options.exportLogs = false;

@@ -9,6 +9,8 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <string>
+#include <thread>
 #include <utility>
 #include <spdlog/spdlog.h>
 #include <spdlog/logger.h>
@@ -44,6 +46,31 @@ public:
             mLogger = spdlog::stdout_color_mt("process-" + classId);
             //NOLINTEND(misc-include-cleaner)
         }
+        // Need a database
+        auto databaseOpenMode
+        {
+            UFilterPickerPickBroker::Database::Mode::ReadWrite
+        };
+        if (std::filesystem::exists(mOptions.sqlite3File))
+        {
+            if (mOptions.deleteDatabaseIfExists)
+            {
+                databaseOpenMode
+                    = UFilterPickerPickBroker::Database::Mode::Create;
+            }
+        }
+        auto database
+            = std::make_unique<UFilterPickerPickBroker::Database> (
+                mOptions.sqlite3File,
+                databaseOpenMode,
+                mLogger);
+        // Now we make the broker
+        mBroker
+            = std::make_unique<UFilterPickerPickBroker::Broker> (
+                mOptions.brokerOptions,
+                std::move(database),
+                mLogger);
+
     }
 
     void start()
@@ -53,6 +80,9 @@ public:
             SPDLOG_LOGGER_WARN(mLogger, "Process is already running");
             stop();
         }
+        mIsRunning = true;
+        mBrokerFuture = mBroker->start();
+        handleMainThread();
     }
 
     void stop()
@@ -62,6 +92,7 @@ public:
             mIsRunning = false;
         }
         if (mBroker){mBroker->stop();}
+        if (mBrokerFuture.valid()){mBrokerFuture.get();}
     }
 
     void printSummary()
@@ -70,11 +101,29 @@ public:
 
     [[nodiscard]] bool checkFuturesOkay(const std::chrono::milliseconds &waitForFuture)
     {
-        return true;
+        bool isOkay{true};
+        try
+        {
+            auto status = mBrokerFuture.wait_for(waitForFuture);
+            if (status == std::future_status::ready)
+            { 
+                mBrokerFuture.get();
+            }
+        }
+        catch (const std::exception &e) 
+        {
+            SPDLOG_LOGGER_CRITICAL(mLogger,
+                                   "Fatal error in broker: {}",
+                                   std::string {e.what()});
+            isOkay = false;
+        }
+        return isOkay;
     }
 
     void handleMainThread()
     {
+        SPDLOG_LOGGER_INFO(mLogger, "Main thread entering waiting loop");
+        stdCatchSignals();
         while (!mStopRequested)
         {
             if (mInterrupted)
@@ -101,6 +150,13 @@ public:
                                         return mStopRequested;
                                     });
         }
+        if (mStopRequested)
+        {
+            SPDLOG_LOGGER_DEBUG(mLogger,
+                                "Stop request received.  Terminating...");
+            stop();
+            std::this_thread::sleep_for(std::chrono::milliseconds {15});
+        }
     }
 
     void stdCatchSignals()
@@ -112,7 +168,7 @@ public:
     static void stdSignalHandler(const int signal)
     {
         mSignalStatus = signal;
-        mInterrupted = true;
+        mInterrupted.store(true);
     }
 
     ~Process()
@@ -125,6 +181,7 @@ public:
     std::unique_ptr<UFilterPickerPickBroker::Broker> mBroker{nullptr};
     mutable std::mutex mStopMutex;
     std::condition_variable mStopCondition;
+    std::future<void> mBrokerFuture;
     bool mStopRequested{false};
     bool mIsRunning{false};
 };
@@ -173,6 +230,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }  
 
+    // Create the logger
     std::shared_ptr<spdlog::logger> logger{nullptr};
     try 
     {   
@@ -188,10 +246,12 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }   
 
+    // Initialize the metrics
 
     std::unique_ptr<::Process> process{nullptr};
     try
     {
+        SPDLOG_LOGGER_INFO(logger, "Initializing main thread");
         process
             = std::make_unique<::Process> (std::move(programOptions), logger);
     }
@@ -200,6 +260,18 @@ int main(int argc, char *argv[])
         SPDLOG_LOGGER_CRITICAL(logger,
                                "Failed to initialize main process because {}",
                                std::string {e.what()});
+        UFilterPickerPickBroker::Logger::cleanup();
+        return EXIT_FAILURE;
+    }
+
+    try
+    {
+        SPDLOG_LOGGER_INFO(logger, "Launching processes");
+        process->start();
+    }
+    catch (const std::exception &e)
+    {
+        UFilterPickerPickBroker::Logger::cleanup();
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

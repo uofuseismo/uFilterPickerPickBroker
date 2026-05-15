@@ -67,7 +67,7 @@ TEST_CASE("UFilterPickerPickBroker", "[Database]")
         auto logger = spdlog::stdout_color_mt("create-db-logger"); // NOLINT
         const std::filesystem::path sqliteFile{"testFile.sqlite3"};
         if (std::filesystem::exists(sqliteFile)){std::filesystem::remove(sqliteFile);}
-        UFP::Database db{logger, sqliteFile, UFP::Database::Mode::Create};
+        UFP::Database db{sqliteFile, UFP::Database::Mode::Create, logger};
         REQUIRE(db.isOpen());
         REQUIRE(!db.isReadOnly());
 

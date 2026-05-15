@@ -101,7 +101,6 @@ public:
 
         const auto grpcOptions = options.getGRPCOptions();
         const auto accessToken = grpcOptions.getAccessToken();
-
         if (isSecured && accessToken != std::nullopt)
         {
             if (!::validatePublisher(context, *accessToken))
@@ -119,7 +118,7 @@ public:
         mMetrics.updatePublishServiceUtilization(utilization);
         mRegistered = true;
         SPDLOG_LOGGER_INFO(mLogger,
-            "Pick publisher connected {}; PublishService managing {} publishers ({} pct utilized)",
+            "{} connected; PublishService managing {} publishers ({} pct utilized)",
             mPeer,
             nPublishers,
             utilization);
@@ -158,8 +157,9 @@ public:
                 return;
             }
         }
-        catch (const DuplicatePickException &)
+        catch (const DuplicatePickException &e)
         {
+            //SPDLOG_LOGGER_DEBUG(mLogger, "Rejected pick because {}");
             ++mRejectedPicks;
             ++mDuplicatePicks;
         }
@@ -183,14 +183,20 @@ public:
 
     void OnDone() override
     {
+#ifndef NDEBUG
+        assert(mLogger != nullptr);
+#endif
         if (mRegistered)
         {
+#ifndef NDEBUG
+            assert(mPublisherCount != nullptr);
+#endif
             const int nPublishers = mPublisherCount->fetch_sub(1) - 1;
             auto utilization
                 = static_cast<double> (nPublishers)
                  /std::max(1, mMaximumNumberOfPublishers);
             mMetrics.updatePublishServiceUtilization(utilization);
-            SPDLOG_LOGGER_DEBUG(mLogger,
+            SPDLOG_LOGGER_INFO(mLogger,
                 "{} disconnected; Now managing {} publishers ({} pct utilized)",
                 mPeer,
                 nPublishers,
@@ -199,12 +205,12 @@ public:
         delete this;
     }
 
+    // Note that we received a cancellation.
     void OnCancel() override
     {
         SPDLOG_LOGGER_INFO(mLogger,
-                           "Async pick broker publish service RPC canceled by {}",
-                           mPeer);
-        Finish(grpc::Status::CANCELLED);
+                         "Async pick broker publish service RPC canceled by {}",
+                          mPeer);
     }
 
 //private:

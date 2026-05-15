@@ -155,9 +155,9 @@ std::string removeBlanksAndLowerCase(const std::string &stringIn)
 class Database::DatabaseImpl
 {
 public:
-    DatabaseImpl(std::shared_ptr<spdlog::logger> logger,
-                 const std::filesystem::path &fileName,
-                 const Database::Mode mode) :
+    DatabaseImpl(const std::filesystem::path &fileName,
+                 const Database::Mode mode,
+                 std::shared_ptr<spdlog::logger> logger) :
         mLogger(std::move(logger))
     {
         if (mLogger == nullptr)
@@ -183,10 +183,14 @@ public:
                 createDatabase = true;
                 if (std::filesystem::exists(fileName))
                 {
-                    std::filesystem::remove(fileName);
                     SPDLOG_LOGGER_WARN(mLogger,
                                        "Removing existing database {}",
                                        std::string{fileName});
+                    if (!std::filesystem::remove(fileName))
+                    {
+                        throw std::runtime_error("Failed to delete "
+                                               + std::string {fileName});
+                    }
                 }
                 const auto directory = fileName.parent_path();
                 if (!directory.empty())
@@ -970,10 +974,10 @@ DELETE FROM picks WHERE time < ?;
 };
 
 Database::Database(
-    std::shared_ptr<spdlog::logger> logger,
     const std::filesystem::path &fileName,
-    const Database::Mode mode) :
-    pImpl(std::make_unique<DatabaseImpl> (std::move(logger), fileName, mode))
+    const Database::Mode mode,
+    std::shared_ptr<spdlog::logger> logger) :
+    pImpl(std::make_unique<DatabaseImpl> (fileName, mode, std::move(logger)))
 {
 }
 

@@ -9,6 +9,7 @@
 #include <vector>
 #include <exception>
 #include <functional>
+#include <future>
 #include <chrono>
 #include <queue>
 #include <mutex>
@@ -16,6 +17,9 @@
 #include <algorithm>
 #include <ranges>
 #include <stdexcept>
+#ifndef NDEBUG
+#include <cassert>
+#endif
 #include <google/protobuf/util/time_util.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/logger.h>
@@ -170,9 +174,33 @@ public:
         /*
         mSubscribeService
             = std::make_unique<SubscribeService> (mOptions.getSubscribeServiceOptions(),
-                                                   loadedPicks,
-                                                   mLogger);
+                                                  loadedPicks,
+                                                  mLogger);
         */
+        mInitialized = true;
+    }
+
+    /// Start the broker
+    std::future<void> start()
+    {
+        if (mStarted)
+        {
+            throw std::runtime_error("Cannot restart broker");
+        }
+#ifndef NDEBUG
+        assert(mPublishService != nullptr);
+        //assert(mSubscribeService != nullptr);
+        assert(mDatabase->isOpen() && !mDatabase->isReadOnly());
+#endif
+        mKeepRunning.store(true);
+        // Start receiving things ASAP
+        mPublishService->start();
+        // Get the propagator pick going
+        auto future = std::async(&BrokerImpl::processPick, this);
+        // Start broadcasting things
+        //mSubsribeService->start();
+        mStarted = true;
+        return future; 
     }
 
     /// Stop the broker
@@ -182,7 +210,7 @@ public:
         constexpr std::chrono::milliseconds pause{15};
         if (mPublishService)
         {
-            SPDLOG_LOGGER_DEBUG(mLogger, "Stopping publish service");
+            SPDLOG_LOGGER_INFO(mLogger, "Stopping publish service");
             mPublishService->stop();
             std::this_thread::sleep_for(pause);
         }
@@ -321,7 +349,6 @@ public:
     {
         return mIsRunning.load();
     }
-private:
 //private:
     BrokerOptions mOptions;
     std::unique_ptr<Database> mDatabase{nullptr};
@@ -346,6 +373,8 @@ private:
     std::mutex mShutdownMutex;
     std::condition_variable mShutdownCondition;
     bool mShutdownRequested{false};
+    bool mInitialized{false};
+    bool mStarted{false};
 };
 
 /// Constructor
@@ -361,6 +390,16 @@ Broker::Broker(const BrokerOptions &options,
 /// Destructor
 Broker::~Broker() = default;
 
+/// Start the broker
+std::future<void> Broker::start()
+{
+    if (!isInitialized())
+    {
+        throw std::runtime_error("Broker not initialized");
+    }
+    return pImpl->start(); 
+}
+
 /// Stop the broker
 void Broker::stop()
 {
@@ -371,4 +410,10 @@ void Broker::stop()
 bool Broker::isRunning() const noexcept
 {
     return pImpl->isRunning();
+}
+
+/// Is the broker initialized?
+bool Broker::isInitialized() const noexcept
+{
+    return pImpl->mInitialized;
 }
