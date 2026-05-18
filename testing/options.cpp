@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <optional>
@@ -134,9 +135,14 @@ TEST_CASE("UFilterPickerPickBroker", "[BrokerOptions]")
     SECTION("Defaults")
     {
         const UFilterPickerPickBroker::BrokerOptions options;
+        constexpr std::chrono::milliseconds retentionInterval
+        {
+            std::chrono::minutes {30}
+        };
         REQUIRE(options.hasPublishServiceOptions() == false);
         REQUIRE(options.hasSubscribeServiceOptions() == false);
         REQUIRE(options.getQueueCapacity() == 8192);
+        REQUIRE(options.getPickRetentionInterval() == retentionInterval);
     }
 
     SECTION("Options")
@@ -145,6 +151,8 @@ TEST_CASE("UFilterPickerPickBroker", "[BrokerOptions]")
         constexpr uint16_t publishPort{6432};
         constexpr uint16_t subscribePort{6433};
         constexpr int queueCapacity{832};
+        constexpr std::chrono::milliseconds 
+            retentionInterval{std::chrono::minutes {11}};
         UFilterPickerPickBroker::GRPCServerOptions grpcPublishOptions;
         grpcPublishOptions.setHost(host);
         grpcPublishOptions.setPort(publishPort);
@@ -163,10 +171,12 @@ TEST_CASE("UFilterPickerPickBroker", "[BrokerOptions]")
         REQUIRE_NOTHROW(options.setPublishServiceOptions(publishOptions));
         REQUIRE_NOTHROW(options.setSubscribeServiceOptions(subscribeOptions));
         REQUIRE_NOTHROW(options.setQueueCapacity(queueCapacity));
+        REQUIRE_NOTHROW(options.setPickRetentionInterval(retentionInterval));
 
         REQUIRE(options.getPublishServiceOptions().getGRPCOptions().getPort() == publishPort);
         REQUIRE(options.getSubscribeServiceOptions().getGRPCOptions().getPort() == subscribePort);
         REQUIRE(options.getQueueCapacity() == queueCapacity);
+        REQUIRE(options.getPickRetentionInterval() == retentionInterval);
     }
 }
 

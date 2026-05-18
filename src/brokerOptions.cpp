@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 #include <utility>
 #include <stdexcept>
@@ -13,6 +14,7 @@ class BrokerOptions::BrokerOptionsImpl
 public:
     PublishServiceOptions mPublishServiceOptions;
     SubscribeServiceOptions mSubscribeServiceOptions;
+    std::chrono::milliseconds mPickRetention{std::chrono::minutes {30}};
     int mQueueCapacity{8192};
     bool mHasPublishServiceOptions{false};
     bool mHasSubscribeServiceOptions{false};
@@ -129,4 +131,20 @@ void BrokerOptions::setQueueCapacity(const int capacity)
 int BrokerOptions::getQueueCapacity() const noexcept
 {
     return pImpl->mQueueCapacity;
+}
+
+void BrokerOptions::setPickRetentionInterval(
+    const std::chrono::milliseconds &pickRetention)
+{
+    if (pickRetention.count() <= 0)
+    {
+        throw std::invalid_argument("Pick retention interval must be positive");
+    }
+    pImpl->mPickRetention = pickRetention;
+}
+
+std::chrono::milliseconds 
+    BrokerOptions::getPickRetentionInterval() const noexcept
+{
+    return pImpl->mPickRetention;
 }

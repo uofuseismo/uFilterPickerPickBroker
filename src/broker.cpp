@@ -325,6 +325,7 @@ SPDLOG_LOGGER_INFO(mLogger, "REceived pick!");
                 try
                 {
                     enqueuePick = true;
+                    mDatabase->add(pick);
                 }
                 catch (const UFilterPickerPickBroker::DuplicatePickException &e)
                 {
@@ -366,6 +367,7 @@ SPDLOG_LOGGER_INFO(mLogger, "REceived pick!");
 
     void cleanDatabase()
     {
+        auto pickRetentionInterval = mOptions.getPickRetentionInterval();
         constexpr std::chrono::seconds cleanEvery{60};
         while (mKeepRunning.load(std::memory_order_relaxed))
         {
@@ -377,7 +379,7 @@ SPDLOG_LOGGER_INFO(mLogger, "REceived pick!");
                       .time_since_epoch();
                 const std::chrono::nanoseconds oldestLoadTime
                     = std::chrono::nanoseconds (now)
-                    - std::chrono::minutes {30};
+                    - pickRetentionInterval;
                 auto nDeleted 
                     = mDatabase->deletePicksBefore(oldestLoadTime, useLoadTime);
                 if (nDeleted > 0)

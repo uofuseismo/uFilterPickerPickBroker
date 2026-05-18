@@ -1,5 +1,6 @@
 #ifndef UFILTER_PICKER_PICK_BROKER_BROKER_OPTIONS_HPP
 #define UFILTER_PICKER_PICK_BROKER_BROKER_OPTIONS_HPP
+#include <chrono>
 #include <memory>
 namespace UFilterPickerPickBroker
 {
@@ -46,6 +47,12 @@ public:
     void setQueueCapacity(int queueCapacity);
     /// @result The maximum internal queue size.
     [[nodiscard]] int getQueueCapacity() const noexcept;
+
+    /// @brief Determines how long the picks can remain in the database before
+    ///        being purged.
+    void setPickRetentionInterval(const std::chrono::milliseconds &retention);
+    /// @result The pick retention time in the database.
+    [[nodiscard]] std::chrono::milliseconds getPickRetentionInterval() const noexcept;
 
     /// @brief Destructor.
     ~BrokerOptions();

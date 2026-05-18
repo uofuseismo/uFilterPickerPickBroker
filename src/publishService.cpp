@@ -141,6 +141,7 @@ public:
             ++mTotalPicks;
             try
             {
+SPDLOG_LOGGER_INFO(mLogger, "Pushing current pick");
                 mCallback(std::move(mCurrentPick));
                 mInvalidMessageCounter = 0;
             }
