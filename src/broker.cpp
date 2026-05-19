@@ -1,3 +1,4 @@
+#include <iostream>
 #include <cstdint>
 #include <cstddef>
 #include <cctype>
@@ -299,6 +300,9 @@ public:
 
     void processPick()
     {
+#ifndef NDEBUG
+        //assert(mSubscribeService !=  nullptr);
+#endif
         while (mKeepRunning.load(std::memory_order_relaxed))
         {
             UFilterPickerPickBrokerAPI::V1::Pick pick;
@@ -314,7 +318,6 @@ public:
             }
             if (gotPick)
             {
-SPDLOG_LOGGER_INFO(mLogger, "REceived pick!");
                 bool enqueuePick{false};
                 try
                 {
@@ -348,7 +351,8 @@ SPDLOG_LOGGER_INFO(mLogger, "REceived pick!");
                 {
                     try
                     {
-                        mSubscribeService->enqueue(std::move(pick));
+                        SPDLOG_LOGGER_INFO(mLogger, "Sending pick to subscribers");
+                        //mSubscribeService->enqueue(std::move(pick));
                     }
                     catch (const std::exception &e)
                     {
@@ -404,14 +408,17 @@ SPDLOG_LOGGER_INFO(mLogger, "REceived pick!");
     {
         if (!pick.has_stream_identifier())
         {
+            SPDLOG_LOGGER_INFO(mLogger, "Stream identifier not set");
             throw std::invalid_argument("Stream identifier not set");
         }
         if (!pick.has_time())
         {
+            SPDLOG_LOGGER_INFO(mLogger, "Pick time not set");
             throw std::invalid_argument("Pick time not set");
         }
         if (!pick.has_algorithm())
         {
+            SPDLOG_LOGGER_INFO(mLogger, "Algorithm not set");
             throw std::invalid_argument("Algorithm not set");
         }
         auto identifier = pick.stream_identifier();
@@ -421,12 +428,16 @@ SPDLOG_LOGGER_INFO(mLogger, "REceived pick!");
         auto newAlgorithm = ::checkAndFixAlgorithm(std::move(algorithm));
         *pick.mutable_algorithm() = std::move(newAlgorithm);
         const auto pickTime
-            = google::protobuf::util::TimeUtil::TimestampToNanoseconds(
-                 pick.time());
+            = std::chrono::nanoseconds
+              {
+                 google::protobuf::util::TimeUtil::TimestampToNanoseconds(
+                     pick.time())
+              };
         const auto now
-            = std::chrono::duration_cast<std::chrono::microseconds>
+            = std::chrono::duration_cast<std::chrono::nanoseconds>
               ((std::chrono::high_resolution_clock::now()).time_since_epoch());
-        if (pickTime > now.count())
+std::cout << pickTime << " " << now << std::endl;
+        if (pickTime > now)
         {
             throw std::invalid_argument("Pick cannot be from future");
         }
@@ -438,7 +449,6 @@ SPDLOG_LOGGER_INFO(mLogger, "REceived pick!");
             mInputQueue.pop();
         }
         mInputQueue.push(std::move(pick));
-std::cout << mInputQueue.size() << std::endl;
         }
     }
 

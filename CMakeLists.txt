@@ -194,9 +194,14 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
    add_executable(unitTests
                   testing/database.cpp
                   testing/options.cpp
+                  testing/service.cpp
                   uFilterPickerPickBrokerAPI/v1/stream_identifier.proto
                   uFilterPickerPickBrokerAPI/v1/phase_hint.proto
                   uFilterPickerPickBrokerAPI/v1/pick.proto
+                  uFilterPickerPickBrokerAPI/v1/publish_service.proto
+                  uFilterPickerPickBrokerAPI/v1/subscribe_service.proto
+                  uFilterPickerPickBrokerAPI/v1/publish_response.proto
+                  uFilterPickerPickBrokerAPI/v1/stream_since_request.proto
    )
    set_target_properties(unitTests PROPERTIES
                          CXX_STANDARD 23
