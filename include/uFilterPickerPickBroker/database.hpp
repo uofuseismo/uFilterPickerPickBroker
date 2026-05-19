@@ -3,7 +3,6 @@
 #include <memory>
 #include <filesystem>
 #include <chrono>
-#include <set>
 #include <string>
 #include <vector>
 #include <spdlog/logger.h>
@@ -20,49 +19,34 @@ namespace UFilterPickerPickBroker
 class Database
 {
 public:
+    /// @brief Defines how to open the database.
     enum class Mode
     {
-        Create,
-        ReadWrite,
-        ReadOnly
+        Create,   /*! Creates the database if it does not exist.  
+                      This will delete the existing database if it does exist.*/
+        ReadWrite /*! Opens the database in read-write mode. */
     };
 public:
-    /// @brief Opens/creates the database.
+    /// @brief Opens or creates the database.
     Database(const std::filesystem::path &sqliteFile,
              Mode mode,
              std::shared_ptr<spdlog::logger> logger);
     /// @result True indicates the database is open.
     [[nodiscard]] bool isOpen() const noexcept;
-    /// @result True indicates the database is open in read-only mode
-    ///         - i.e., no writing.
-    [[nodiscard]] bool isReadOnly() const noexcept;
 
-    /// @brief Add a pick.
-    /// @param[in] pick  The pick to add.
-    void add(const UFilterPickerPickBrokerAPI::V1::Pick &pick);
+    /// @brief Add a pick. Throws DuplicatePickException if the pick already exists.
+    void add(const std::chrono::nanoseconds &receivedTime,
+             const UFilterPickerPickBrokerAPI::V1::Pick &pick);
 
-    /// @result All picks currently in the database.
-    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getAllPicks() const;
-    /// @result The picks in the database whose time exceeds the given value.
-    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getPicksSince(
-        const std::chrono::nanoseconds &startTime) const;
+    /// @result All picks currently in the database, ordered by load time.
+    [[nodiscard]] std::vector<std::pair<std::chrono::nanoseconds,
+                                        UFilterPickerPickBrokerAPI::V1::Pick>>
+        load() const;
 
-    /// @result The currently available streams.
-    [[nodiscard]] std::set<std::string> getStreams() const;
-    /// @result Gets the most recently submitted picks.
-    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getMostRecentlySubmittedPicks() const;
-    /// @result Gets the most limit-most recently submitted picks.
-    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getMostRecentlySubmittedPicks(int limit) const;
-
-    /// @brief Deletes picks before a given time.
-    /// @param[in] time   Picks before this time will be deleted.
-    /// @param[in] useLoadTime  If true then picks loaded (received) before
-    ///                         this time will be deleted.
-    ///                         Otherwise, picks whose time before this time
-    ///                         will be deleted.
+    /// @brief Deletes picks loaded before a given time.
+    /// @param[in] time  Picks loaded before this time will be deleted.
     /// @result The number of picks deleted.
-    [[nodiscard]] int deletePicksBefore(const std::chrono::nanoseconds &time,
-                                        const bool useLoadTime);
+    [[nodiscard]] int deletePicksBefore(const std::chrono::nanoseconds &time);
 
     /// @brief Close the database.
     void close();

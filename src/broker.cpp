@@ -135,11 +135,6 @@ public:
         {
             throw std::invalid_argument("Database is not open");
         }
-        if (mDatabase->isReadOnly())
-        {
-            throw std::invalid_argument(
-                "Database must be open in read-write mode");
-        }
         if (!mOptions.hasPublishServiceOptions())
         {
             throw std::invalid_argument(
@@ -169,8 +164,7 @@ public:
 
         // Create subscribe service (picks go out)
         const auto subscribeServiceOptions = mOptions.getSubscribeServiceOptions();
-        const auto maxPicksToLoad = subscribeServiceOptions.getQueueCapacity();
-        auto loadedPicks = mDatabase->getMostRecentlySubmittedPicks(maxPicksToLoad);
+        auto loadedPicks = mDatabase->load();
         /*
         mSubscribeService
             = std::make_unique<SubscribeService> (mOptions.getSubscribeServiceOptions(),
@@ -190,7 +184,7 @@ public:
 #ifndef NDEBUG
         assert(mPublishService != nullptr);
         //assert(mSubscribeService != nullptr);
-        assert(mDatabase->isOpen() && !mDatabase->isReadOnly());
+        assert(mDatabase->isOpen());
 #endif
         mKeepRunning.store(true);
         // Start receiving things ASAP
@@ -325,7 +319,14 @@ SPDLOG_LOGGER_INFO(mLogger, "REceived pick!");
                 try
                 {
                     enqueuePick = true;
-                    mDatabase->add(pick);
+                    const auto now 
+                        = std::chrono::high_resolution_clock::now()
+                          .time_since_epoch();
+                    const std::chrono::nanoseconds receivedTime
+                    {
+                        std::chrono::nanoseconds(now)
+                    };
+                    mDatabase->add(receivedTime, pick);
                 }
                 catch (const UFilterPickerPickBroker::DuplicatePickException &e)
                 {
@@ -373,15 +374,13 @@ SPDLOG_LOGGER_INFO(mLogger, "REceived pick!");
         {
             if (mDatabase->isOpen())
             {
-                constexpr bool useLoadTime{true};
                 const auto now
                     = std::chrono::high_resolution_clock::now()
                       .time_since_epoch();
                 const std::chrono::nanoseconds oldestLoadTime
-                    = std::chrono::nanoseconds (now)
-                    - pickRetentionInterval;
-                auto nDeleted 
-                    = mDatabase->deletePicksBefore(oldestLoadTime, useLoadTime);
+                    = std::chrono::nanoseconds(now) - pickRetentionInterval;
+                auto nDeleted
+                    = mDatabase->deletePicksBefore(oldestLoadTime);
                 if (nDeleted > 0)
                 {
                     SPDLOG_LOGGER_INFO(mLogger, "Deleted {} picks", nDeleted);

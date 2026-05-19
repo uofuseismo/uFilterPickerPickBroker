@@ -1,224 +1,193 @@
-//#include <bit>
-//#include <type_traits>
-#include <filesystem>
-//#include <limits>
-#include <cstddef>
-#include <cstdint>
-#include <cmath>
-#include <vector>
-#include <numeric>
-#include <set>
-#include <string>
+#include <algorithm>
 #include <chrono>
-#ifndef NDEBUG
-#include <cassert>
-#endif
+#include <cmath>
+#include <filesystem>
+#include <string>
+#include <utility>
+#include <vector>
+//NOLINTBEGIN(misc-include-cleaner)
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+//NOLINTEND(misc-include-cleaner)
 #include <google/protobuf/util/time_util.h>
 #include "uFilterPickerPickBroker/database.hpp"
 #include "uFilterPickerPickBroker/exception.hpp"
 #include <uFilterPickerPickBrokerAPI/v1/pick.pb.h>
-#include <uFilterPickerPickBrokerAPI/v1/phase_hint.pb.h>
 #include <uFilterPickerPickBrokerAPI/v1/stream_identifier.pb.h>
-#include <uFilterPickerPickBrokerAPI/v1/algorithm.pb.h>
+#include <uFilterPickerPickBrokerAPI/v1/phase_hint.pb.h>
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/catch_template_test_macros.hpp>
-//#include <catch2/catch_approx.hpp>
-//#include <catch2/benchmark/catch_benchmark.hpp>
-#include <catch2/matchers/catch_matchers.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "utilities.hpp"
 
 namespace
 {
 
-bool comparePicks(const auto &lhs, const auto &rhs)
+[[nodiscard]] std::chrono::seconds getNow() 
 {
-    if (lhs.stream_identifier().network() !=
-        rhs.stream_identifier().network()){return false;}
-    if (lhs.stream_identifier().station() !=
-        rhs.stream_identifier().station()){return false;}
-    if (lhs.stream_identifier().channel() !=
-        rhs.stream_identifier().channel()){return false;}
-    if (lhs.stream_identifier().location_code() !=
-        rhs.stream_identifier().location_code())
-    {
-        return false;
-    }
+     auto now 
+        = std::chrono::duration_cast<std::chrono::seconds>
+          ((std::chrono::high_resolution_clock::now()).time_since_epoch());
+     return now;
+}
+
+
+bool comparePicks(const UFilterPickerPickBrokerAPI::V1::Pick &lhs,
+                  const UFilterPickerPickBrokerAPI::V1::Pick &rhs)
+{
+    if (lhs.stream_identifier().network() != rhs.stream_identifier().network()){return false;}
+    if (lhs.stream_identifier().station() != rhs.stream_identifier().station()){return false;}
+    if (lhs.stream_identifier().channel() != rhs.stream_identifier().channel()){return false;}
+    if (lhs.stream_identifier().location_code() != rhs.stream_identifier().location_code()){return false;}
     if (google::protobuf::util::TimeUtil::TimestampToNanoseconds(lhs.time()) !=
-        google::protobuf::util::TimeUtil::TimestampToNanoseconds(rhs.time()))
-    {
-        return false;
-    }
-
+        google::protobuf::util::TimeUtil::TimestampToNanoseconds(rhs.time())){return false;}
     if (lhs.phase_hint() != rhs.phase_hint()){return false;}
-
     if (lhs.algorithm().name() != rhs.algorithm().name()){return false;}
     if (lhs.algorithm().version() != rhs.algorithm().version()){return false;}
     if (lhs.algorithm().tag() != rhs.algorithm().tag()){return false;}
     return true;
 }
 
-bool contains(const auto &pick,
-              const std::vector<UFilterPickerPickBrokerAPI::V1::Pick> &vector)
+bool containsPick(const UFilterPickerPickBrokerAPI::V1::Pick &needle,
+                  const std::vector<std::pair<std::chrono::nanoseconds,
+                                               UFilterPickerPickBrokerAPI::V1::Pick>> &haystack)
 {
-    for (const auto &item : vector)
+    for (const auto &[t, p] : haystack)
     {
-        if (::comparePicks(item, pick)){return true;}
+        if (::comparePicks(p, needle)){return true;}
     }
     return false;
 }
 
-bool contains(const std::vector<UFilterPickerPickBrokerAPI::V1::Pick> &vector,
-              const auto &pick)
-{
-    return contains(pick, vector);
 }
 
-bool comparePicks(const std::vector<UFilterPickerPickBrokerAPI::V1::Pick> &lhs,
-                  const std::vector<UFilterPickerPickBrokerAPI::V1::Pick> &rhs)
-{
-    if (lhs.size() != rhs.size()){return false;}
-    for (const auto &lhsi : lhs)
-    {
-        if (!::contains(lhsi, rhs)){return false;}
-    }
-    return true;
-}
-
-}
-
-TEST_CASE("UFilterPickerPickBroker", "[Database]")
+TEST_CASE("Database", "[Database]")
 {
     namespace UFP = UFilterPickerPickBroker;
-    SECTION("Simple create and delete")
+    const std::filesystem::path sqliteFile{"testDatabase.sqlite3"};
+
+    SECTION("Add and duplicate pick")
     {
-        auto logger = spdlog::stdout_color_mt("create-db-logger-1"); // NOLINT
-        const std::filesystem::path sqliteFile{"testFile.sqlite3"};
+        const auto receivedTime = ::getNow();
+
         if (std::filesystem::exists(sqliteFile)){std::filesystem::remove(sqliteFile);}
+
+        auto logger = spdlog::stdout_color_mt("db-test-1"); // NOLINT
         UFP::Database db{sqliteFile, UFP::Database::Mode::Create, logger};
         REQUIRE(db.isOpen());
-        REQUIRE(!db.isReadOnly());
 
-        const std::string network{"UU"};
-        const std::string station{"KNb "};
-        const std::string channel{" hHZ"};
-        const std::string locationCode{"01"};
-        const std::string algorithmName{"ufp-test"};
-        const std::string algorithmVersion{"0.1.0"};
-        const std::string algorithmTag{"322389ds"};
-        const std::chrono::seconds pickTime{1777408746};
-        const auto phaseHint{UFilterPickerPickBrokerAPI::V1::PhaseHint::PHASE_HINT_P};
-        auto identifier = ::createIdentifier(network, station, channel, locationCode);
-        auto algorithm = ::createAlgorithm(algorithmName, algorithmVersion, algorithmTag);
-        auto pick = ::createPick(pickTime, identifier, algorithm, phaseHint);
+        const auto phaseHint = UFilterPickerPickBrokerAPI::V1::PhaseHint::PHASE_HINT_P;
+        auto identifier = ::createIdentifier("UU", "KNB", "HHZ", "01");
+        auto algorithm  = ::createAlgorithm("ufp", "1.0.0", "abc");
+        auto pick1 = ::createPick(std::chrono::seconds{1777408746},
+                                  identifier, algorithm, phaseHint);
 
-        REQUIRE_NOTHROW(db.add(pick));
-        REQUIRE_THROWS_AS(db.add(pick), UFilterPickerPickBroker::DuplicatePickException);
+        // Add a duplicate pick
+        REQUIRE_NOTHROW(db.add(receivedTime, pick1));
+        REQUIRE_THROWS_AS(db.add(receivedTime + std::chrono::seconds {1}, pick1), UFP::DuplicatePickException);
 
-        auto allPicks = db.getAllPicks();
-        REQUIRE(allPicks.size() == 1);
-        REQUIRE(::comparePicks(allPicks.at(0), pick) == true);
-        constexpr bool useLoadTime{false};
-        REQUIRE(db.deletePicksBefore(pickTime + std::chrono::seconds {0}, useLoadTime) == 0);
-        REQUIRE(db.deletePicksBefore(pickTime + std::chrono::seconds {1}, useLoadTime) == 1);
+        auto picks = db.load();
+        REQUIRE(picks.size() == 1);
+        REQUIRE(::comparePicks(picks.at(0).second, pick1));
     }
 
-    SECTION("Create two")
+    SECTION("Add two picks and load")
     {
-        auto logger = spdlog::stdout_color_mt("create-db-logger-2"); // NOLINT
-        const std::filesystem::path sqliteFile{"testFile.sqlite3"};
+        const auto receivedTime = ::getNow();
+
         if (std::filesystem::exists(sqliteFile)){std::filesystem::remove(sqliteFile);}
+
+        auto logger = spdlog::stdout_color_mt("db-test-2"); // NOLINT
         UFP::Database db{sqliteFile, UFP::Database::Mode::Create, logger};
         REQUIRE(db.isOpen());
-        REQUIRE(!db.isReadOnly());
 
-        const std::string network{"UU"};
-        const std::string station1{"KNb "};
-        const std::string station2{"PCCW"};
-        const std::string channel{" hHZ"};
-        const std::string locationCode{"01"};
-        const std::string algorithmName{"ufp-test"};
-        const std::string algorithmVersion{"0.1.0"};
-        const std::string algorithmTag{"322389ds"};
-        const std::chrono::seconds pickTime{1777408746};
-        const auto phaseHint{UFilterPickerPickBrokerAPI::V1::PhaseHint::PHASE_HINT_P};
-        auto identifier = ::createIdentifier(network, station1, channel, locationCode);
-        auto algorithm = ::createAlgorithm(algorithmName, algorithmVersion, algorithmTag);
-        auto pick1 = ::createPick(pickTime, identifier, algorithm, phaseHint);
+        const auto phaseHint = UFilterPickerPickBrokerAPI::V1::PhaseHint::PHASE_HINT_P;
+        auto identifier = ::createIdentifier("UU", "KNB", "HHZ", "01");
+        auto algorithm  = ::createAlgorithm("ufp", "1.0.0", "abc");
+        auto pick1 = ::createPick(std::chrono::seconds{1777408746},
+                                  identifier, algorithm, phaseHint);
 
-        REQUIRE_NOTHROW(db.add(pick1));
-        REQUIRE_THROWS_AS(db.add(pick1), UFilterPickerPickBroker::DuplicatePickException);
+        auto identifier2 = ::createIdentifier("UU", "PCCW", "HHZ", "");
+        auto pick2 = ::createPick(std::chrono::seconds{1777408800},
+                                   identifier2, algorithm, phaseHint);
 
-        identifier = ::createIdentifier(network, station2, channel, "");//locationCode);
-        auto pick2 = ::createPick(pickTime, identifier, algorithm, phaseHint);
-        REQUIRE_NOTHROW(db.add(pick2));
+        REQUIRE_NOTHROW(db.add(receivedTime, pick1));
+        REQUIRE_NOTHROW(db.add(receivedTime, pick2));
 
-        auto allStreams = db.getStreams();
-        REQUIRE(allStreams.contains("UU.KNB.HHZ.01") == true);
-        REQUIRE(allStreams.contains("UU.PCCW.HHZ.--") == true);
+        auto picks = db.load();
+        REQUIRE(picks.size() == 2);
+        REQUIRE(::containsPick(pick1, picks));
+        REQUIRE(::containsPick(pick2, picks));
+    }
 
-        auto allPicks = db.getAllPicks();
-        REQUIRE(allPicks.size() == 2); 
-        REQUIRE(::contains(pick1, allPicks) == true);
-        REQUIRE(::contains(pick2, allPicks) == true);
-        //REQUIRE(::comparePicks(allPicks.at(0), pick) == true);
-        constexpr bool useLoadTime{false};
-        REQUIRE(db.deletePicksBefore(pickTime + std::chrono::seconds {0}, useLoadTime) == 0);
-        REQUIRE(db.deletePicksBefore(pickTime + std::chrono::seconds {1}, useLoadTime) == 2); 
+    SECTION("Delete picks before time")
+    {
+        auto logger = spdlog::stdout_color_mt("db-test-3"); // NOLINT
+        UFP::Database db{sqliteFile, UFP::Database::Mode::Create, logger};
+        REQUIRE(db.isOpen());
+
+        const auto phaseHint = UFilterPickerPickBrokerAPI::V1::PhaseHint::PHASE_HINT_P;
+        auto identifier1 = ::createIdentifier("UU", "KNB", "HHZ", "01");
+        auto algorithm   = ::createAlgorithm("ufp", "1.0.0", "abc");
+        // Do something a little wonky - add the "first" pick after the "second" pick
+        const auto receivedTime1 = ::getNow() - std::chrono::seconds{2};
+        const auto receivedTime2 = ::getNow() - std::chrono::seconds{3};
+        auto pick1 = ::createPick(std::chrono::seconds{1777408746},
+                                  identifier1, algorithm, phaseHint);
+
+        auto identifier2 = ::createIdentifier("UU", "PCCW", "HHZ", "");
+        auto pick2 = ::createPick(std::chrono::seconds{1777408744},
+                                  identifier2, algorithm, phaseHint);
+
+        REQUIRE_NOTHROW(db.add(receivedTime1, pick1));
+        REQUIRE_NOTHROW(db.add(receivedTime2, pick2));
+
+        auto picks = db.load();
+        REQUIRE(picks.size() == 2);
+        const auto deleteTime = std::min(receivedTime1, receivedTime2);
+
+        REQUIRE(db.deletePicksBefore(deleteTime) == 0);
+        REQUIRE(db.deletePicksBefore(deleteTime + std::chrono::nanoseconds{1}) == 1);
+        REQUIRE(db.load().size() == 1);
     }
 }
 
-TEST_CASE("UFilterPickerPickBroker", "[DatabaseRestore]")
-{       
+TEST_CASE("Database restore", "[DatabaseRestore]")
+{
     namespace UFP = UFilterPickerPickBroker;
-    auto logger = spdlog::stdout_color_mt("create-db-restore-logger-1"); // NOLINT
-    const std::filesystem::path sqliteFile{"testFileRestore.sqlite3"};
-    if (std::filesystem::exists(sqliteFile)){std::filesystem::remove(sqliteFile);}
-    UFP::Database db{sqliteFile, UFP::Database::Mode::Create, logger};
-    REQUIRE(db.isOpen());
-    REQUIRE(!db.isReadOnly());
+    const std::filesystem::path sqliteFile{"testDatabaseRestore.sqlite3"};
 
-    const std::string network{"UU"};
-    const std::string station1{"KNB"};
-    const std::string station2{"PCCW"};
-    const std::string channel{"HHZ"};
-    const std::string locationCode{"01"};
-    const std::string algorithmName{"ufp-test-restore"};
-    const std::string algorithmVersion{"0.1.0"};
-    const std::string algorithmTag{"322389ds"};
-    const std::chrono::seconds pickTime{1777408746};
-    const auto phaseHint{UFilterPickerPickBrokerAPI::V1::PhaseHint::PHASE_HINT_P};
-    auto identifier = ::createIdentifier(network, station1, channel, locationCode);
-    auto algorithm = ::createAlgorithm(algorithmName, algorithmVersion, algorithmTag);
-    auto pick1 = ::createPick(pickTime, identifier, algorithm, phaseHint);
+    const auto pickTime = ::getNow() - std::chrono::seconds{10};
+    const auto phaseHint = UFilterPickerPickBrokerAPI::V1::PhaseHint::PHASE_HINT_P;
+    auto identifier1 = ::createIdentifier("UU", "KNB",  "HHZ", "01");
+    auto identifier2 = ::createIdentifier("UU", "PCCW", "HHZ", "");
+    auto algorithm   = ::createAlgorithm("ufp", "1.0.0", "abc");
+    
+    auto pick1 = ::createPick(pickTime, identifier1, algorithm, phaseHint);
+    auto pick2 = ::createPick(pickTime, identifier2, algorithm, phaseHint);
 
-    REQUIRE_NOTHROW(db.add(pick1));
-    REQUIRE_THROWS_AS(db.add(pick1), UFilterPickerPickBroker::DuplicatePickException);
-
-    identifier = ::createIdentifier(network, station2, channel, "");//locationCode);
-    auto pick2 = ::createPick(pickTime, identifier, algorithm, phaseHint);
-    REQUIRE_NOTHROW(db.add(pick2));
-    db.close();
- 
-    SECTION("Restore")
+    SECTION("Write picks then close database as if it were a shutdown")
     {
-        auto loggerRestore = spdlog::stdout_color_mt("create-db-restore-logger-2"); // NOLINT
-        UFP::Database dbr{sqliteFile, UFP::Database::Mode::ReadWrite, loggerRestore};
-        REQUIRE(dbr.isOpen());
-        REQUIRE(!dbr.isReadOnly());
+        const auto receivedTime = ::getNow();
 
-        auto allStreams = dbr.getStreams();
-        REQUIRE(allStreams.contains("UU.KNB.HHZ.01") == true);
-        REQUIRE(allStreams.contains("UU.PCCW.HHZ.--") == true);
+        auto logger = spdlog::stdout_color_mt("db-restore-write"); // NOLINT
+        UFP::Database db{sqliteFile, UFP::Database::Mode::Create, logger};
+        REQUIRE_NOTHROW(db.add(receivedTime, pick1));
+        REQUIRE_NOTHROW(db.add(receivedTime, pick2));
+        REQUIRE_NOTHROW(db.close());
+    }
 
-        auto allPicks = dbr.getAllPicks();
-        REQUIRE(allPicks.size() == 2); 
-        REQUIRE(::contains(pick1, allPicks) == true);
-        REQUIRE(::contains(pick2, allPicks) == true);
+    SECTION("Reopen database and read picks as if it were a restart")
+    {
+        auto logger = spdlog::stdout_color_mt("db-restore-read"); // NOLINT
+        REQUIRE(std::filesystem::exists(sqliteFile) == true);
+        const UFP::Database db{sqliteFile, UFP::Database::Mode::ReadWrite, logger};
+        REQUIRE(db.isOpen());
+
+        auto picks = db.load();
+        REQUIRE(picks.size() == 2);
+        REQUIRE(::containsPick(pick1, picks));
+        REQUIRE(::containsPick(pick2, picks));
+        REQUIRE(picks.at(0).first <= picks.at(1).first);
 
         std::filesystem::remove(sqliteFile);
     }
 }
-
