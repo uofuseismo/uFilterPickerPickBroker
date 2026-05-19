@@ -19,6 +19,7 @@
 #include "uFilterPickerPickBroker/grpcServerOptions.hpp"
 #include "uFilterPickerPickBroker/database.hpp"
 #include "otelOptions.hpp"
+#include "programOptions.hpp"
 
 namespace
 {
@@ -34,6 +35,7 @@ struct ProgramOptions
     UFilterPickerPickBroker::OTelOptions::GRPCLog otelGRPCLogOptions;
     std::string applicationName{APPLICATION_NAME};
     std::filesystem::path sqlite3File{"uFilterPickerMessageStore.sqlite3"};
+    std::chrono::seconds printSummaryInterval{std::chrono::minutes {15}};
     int verbosity{3};
     bool exportLogs{false};
     bool exportLogsWithHTTP{true};
@@ -316,6 +318,15 @@ ProgramOptions parseIniFile(const std::filesystem::path &iniFile)
     }   
     options.verbosity
         = propertyTree.get<int> ("General.verbosity", options.verbosity);
+
+    auto summaryIntervalInMinutes
+        = static_cast<int> (options.printSummaryInterval.count());
+    summaryIntervalInMinutes
+        = propertyTree.get<int> ("General.printSummaryIntervalInMinutes",
+                                 summaryIntervalInMinutes);
+    options.printSummaryInterval 
+        = std::chrono::minutes {summaryIntervalInMinutes};
+                                 
 
     // Database
     auto sqlite3FileName = std::string {options.sqlite3File};

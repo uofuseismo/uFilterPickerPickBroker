@@ -20,6 +20,7 @@
 #include "uFilterPickerPickBroker/metricsSingleton.hpp"
 #include "programOptions.hpp"
 #include "logger.hpp"
+#include "metrics.hpp"
 
 namespace
 {
@@ -92,40 +93,31 @@ public:
             mIsRunning = false;
         }
         if (mBroker){mBroker->stop();}
-        //if (mBrokerFuture.valid()){mBrokerFuture.get();}
     }
 
+    /// @brief Periodically prints a summary to a log file as another way
+    ///        to demonstrate this application is alive and doing what it is
+    ///        supposed to.
     void printSummary()
     {
+        /// 
+        if (mOptions.printSummaryInterval.count() <= 0){return;}
     }
 
-    [[nodiscard]] bool checkFuturesOkay(const std::chrono::milliseconds &waitForFuture)
+    /// @brief Checks for errors on the threads.
+    /// @result True indicates everything appears okay.
+    [[nodiscard]] bool checkFuturesOkay(
+        const std::chrono::milliseconds &waitForFuture)
     {
         bool isOkay{true};
         if (mBroker)
         {
             isOkay = mBroker->checkFuturesOkay(waitForFuture);
         }
-/*
-        try
-        {
-            auto status = mBrokerFuture.wait_for(waitForFuture);
-            if (status == std::future_status::ready)
-            { 
-                mBrokerFuture.get();
-            }
-        }
-        catch (const std::exception &e) 
-        {
-            SPDLOG_LOGGER_CRITICAL(mLogger,
-                                   "Fatal error in broker: {}",
-                                   std::string {e.what()});
-            isOkay = false;
-        }
-*/
         return isOkay;
     }
 
+    /// @brief Handles main thread activities.
     void handleMainThread()
     {
         SPDLOG_LOGGER_INFO(mLogger, "Main thread entering waiting loop");
@@ -252,6 +244,18 @@ int main(int argc, char *argv[])
     }   
 
     // Initialize the metrics
+    try
+    {
+        UFilterPickerPickBroker::Metrics::initialize(programOptions);
+    }
+    catch (const std::exception &e)
+    {
+        SPDLOG_LOGGER_CRITICAL(logger,
+                               "Failed to initialize metrics because {}",
+                               std::string {e.what()});
+        UFilterPickerPickBroker::Logger::cleanup();
+        return EXIT_FAILURE;
+    }
 
     std::unique_ptr<::Process> process{nullptr};
     try
@@ -265,6 +269,7 @@ int main(int argc, char *argv[])
         SPDLOG_LOGGER_CRITICAL(logger,
                                "Failed to initialize main process because {}",
                                std::string {e.what()});
+        UFilterPickerPickBroker::Metrics::cleanup();
         UFilterPickerPickBroker::Logger::cleanup();
         return EXIT_FAILURE;
     }
@@ -276,6 +281,7 @@ int main(int argc, char *argv[])
     }
     catch (const std::exception &e)
     {
+        UFilterPickerPickBroker::Metrics::cleanup();
         UFilterPickerPickBroker::Logger::cleanup();
         return EXIT_FAILURE;
     }
