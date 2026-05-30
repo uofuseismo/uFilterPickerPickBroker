@@ -12,6 +12,7 @@
 #include <utility>
 #include <grpcpp/grpcpp.h>
 #include <google/protobuf/util/time_util.h>
+#include <google/protobuf/duration.pb.h>
 #include <grpcpp/channel.h>
 #include <grpcpp/security/credentials.h>
 #include <grpcpp/support/client_callback.h>
@@ -181,7 +182,7 @@ void runPublisher()
                             Version::getVersion(),
                             Version::getTag());
 
-     auto now 
+    auto now 
         = std::chrono::duration_cast<std::chrono::seconds>
           ((std::chrono::high_resolution_clock::now()).time_since_epoch());
     auto baseTime = now - std::chrono::seconds {nPicks + 1};
@@ -205,6 +206,67 @@ void runPublisher()
     Publisher publisher(stub.get(), picks);
     auto status = publisher.await(&summary);
     CHECK(status.ok() == true);
+}
+
+void runSubscriber()
+{
+    class Subscriber final :
+        public grpc::ClientReadReactor<UFilterPickerPickBrokerAPI::V1::Pick>
+    {
+    public:
+        Subscriber(UFilterPickerPickBrokerAPI::V1::SubscribeService::Stub *stub,
+             std::vector<UFilterPickerPickBrokerAPI::V1::Pick> *receivedPicks) :
+            mReceivedPicks(receivedPicks)
+        {
+            //mRequest.identifier(); //
+            //mRequest.backfill_duration();
+            stub->async()->StreamSince(&mContext, &mRequest, this);
+            StartRead(&mPick);
+            StartCall();    
+        }
+        void OnReadDone(bool ok) override
+        {
+            if (ok)
+            {
+                mReceivedPicks->push_back(mPick);
+                StartRead(&mPick);
+            } 
+        }
+        void OnDone(const grpc::Status &status) override
+        {
+            const std::unique_lock<std::mutex> lock(mMutex);
+            mStatus = status;
+            mDone = true;
+            mConditionVariable.notify_one();
+        }
+        [[nodiscard]] grpc::Status await()
+        {
+            std::unique_lock<std::mutex> lock(mMutex);
+            mConditionVariable.wait(lock, [this] {return mDone;});
+            return std::move(mStatus);
+        } 
+        std::vector<UFilterPickerPickBrokerAPI::V1::Pick> 
+            *mReceivedPicks{nullptr};
+        grpc::ClientContext mContext;
+        std::mutex mMutex;
+        std::condition_variable mConditionVariable; 
+        grpc::Status mStatus;
+        UFilterPickerPickBrokerAPI::V1::StreamSinceRequest mRequest;
+        UFilterPickerPickBrokerAPI::V1::Pick mPick;
+        bool mDone{false};
+    };
+
+    auto address = std::string {SUBSCRIBE_SERVICE_HOST}
+                 + ":"
+                 + std::to_string(SUBSCRIBE_SERVICE_PORT);
+    auto channel
+        = grpc::CreateChannel(address, grpc::InsecureChannelCredentials());
+    auto stub
+        = UFilterPickerPickBrokerAPI::V1::SubscribeService::NewStub(channel);
+    std::vector<UFilterPickerPickBrokerAPI::V1::Pick> receivedPicks;
+    Subscriber subscriber(stub.get(), &receivedPicks);
+    auto status = subscriber.await();
+    REQUIRE(status.ok());
 }
 
 }

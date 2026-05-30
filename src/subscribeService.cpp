@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <future>
@@ -313,6 +315,7 @@ public:
                            "SubscribeService listening at {}", address);
         mServer = builder.BuildAndStart();
         mServer->Wait();
+        mStarted = true;
     }
 
     void stop()
@@ -321,18 +324,25 @@ public:
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
         if (mServer)
         {
-            SPDLOG_LOGGER_INFO(mLogger, "Shutting down subscribe service");
+            if (mStarted)
+            {
+                SPDLOG_LOGGER_INFO(mLogger, "Shutting down subscribe service");
+            }
             mServer->Shutdown();
-            SPDLOG_LOGGER_INFO(mLogger, "Subscribe service shut down");
+            if (mStarted)
+            {
+                SPDLOG_LOGGER_INFO(mLogger, "Subscribe service shut down");
+            }
         }
         mSubscriberCount.store(0);
         MetricsSingleton::getInstance().updateSubscribeServiceUtilization(0);
+        mStarted = false;
     }
 
     void enqueue(UFilterPickerPickBrokerAPI::V1::Pick &&pick)
     {
         mPickStore->enqueue(std::move(pick));
-        std::lock_guard lock(mWritersMutex);
+        const std::lock_guard lock(mWritersMutex);
         for (auto *writer : mActiveWriters)
         {
             writer->tryWrite();
@@ -341,7 +351,7 @@ public:
 
     void unregisterWriter(::AsynchronousWriter *writer)
     {
-        std::lock_guard lock(mWritersMutex);
+        const std::lock_guard lock(mWritersMutex);
         mActiveWriters.erase(writer);
     }
 
@@ -361,7 +371,7 @@ public:
             mLogger);
         if (writer->isRegistered())
         {
-            std::lock_guard lock(mWritersMutex);
+            const std::lock_guard lock(mWritersMutex);
             mActiveWriters.insert(writer);
         }
         return writer;
@@ -387,6 +397,7 @@ private:
     std::atomic<int> mSubscriberCount{0};
     std::atomic<bool> mKeepRunning{true};
     bool mSecured{false};
+    bool mStarted{false};
 };
 
 /// Constructor
