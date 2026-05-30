@@ -164,14 +164,20 @@ public:
                                                 mLogger);
 
         // Create subscribe service (picks go out)
-        const auto subscribeServiceOptions = mOptions.getSubscribeServiceOptions();
+        const auto subscribeServiceOptions
+            = mOptions.getSubscribeServiceOptions();
         auto loadedPicks = mDatabase->load();
-        /*
+        auto pickStoreCapacity = subscribeServiceOptions.getQueueCapacity();
+        PickStoreOptions pickStoreOptions;
+        pickStoreOptions.setMaximumQueueSize(pickStoreCapacity);
+        auto pickStore
+            = std::make_unique<PickStore> (pickStoreOptions,
+                                           loadedPicks,
+                                           mLogger);
         mSubscribeService
-            = std::make_unique<SubscribeService> (mOptions.getSubscribeServiceOptions(),
-                                                  loadedPicks,
+            = std::make_unique<SubscribeService> (subscribeServiceOptions,
+                                                  std::move(pickStore),
                                                   mLogger);
-        */
         mInitialized = true;
     }
 
@@ -184,7 +190,7 @@ public:
         }
 #ifndef NDEBUG
         assert(mPublishService != nullptr);
-        //assert(mSubscribeService != nullptr);
+        assert(mSubscribeService != nullptr);
         assert(mDatabase->isOpen());
 #endif
         mKeepRunning.store(true);
@@ -195,7 +201,7 @@ public:
         // Make a thread to clean the database
         mDatabaseCleanerFuture = std::async(&BrokerImpl::cleanDatabase, this);
         // Start broadcasting things
-        //mSubscribeServiceFuture = mSubsribeService->start();
+        mSubscribeServiceFuture = mSubscribeService->start();
         mStarted = true;
     }
 
@@ -231,7 +237,6 @@ public:
         const std::chrono::milliseconds &waitForFuture)
     {
         bool isOkay{true};
-/*
         try
         {
             auto status = mSubscribeServiceFuture.wait_for(waitForFuture);
@@ -247,7 +252,6 @@ public:
                                    std::string {e.what()});
             isOkay = false;
         }
-*/
         try
         {
             auto status = mPublishServiceFuture.wait_for(waitForFuture);
@@ -301,7 +305,7 @@ public:
     void processPick()
     {
 #ifndef NDEBUG
-        //assert(mSubscribeService !=  nullptr);
+        assert(mSubscribeService !=  nullptr);
 #endif
         while (mKeepRunning.load(std::memory_order_relaxed))
         {
@@ -352,7 +356,7 @@ public:
                     try
                     {
                         SPDLOG_LOGGER_INFO(mLogger, "Sending pick to subscribers");
-                        //mSubscribeService->enqueue(std::move(pick));
+                        mSubscribeService->enqueue(std::move(pick));
                     }
                     catch (const std::exception &e)
                     {

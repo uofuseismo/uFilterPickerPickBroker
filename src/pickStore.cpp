@@ -50,12 +50,13 @@ public:
         if (mLogger == nullptr)
         {
             // NOLINTBEGIN(misc-include-cleaner)
-            auto classId = std::to_string(reinterpret_cast<std::uintptr_t>(this));
+            auto classId
+                 = std::to_string(reinterpret_cast<std::uintptr_t> (this));
             mLogger = spdlog::stdout_color_mt("PickStoreConsole-" + classId);
             // NOLINTEND(misc-include-cleaner)
         }
         for (auto &[t, p] : backfillPicks)
-        {   
+        {
             mDeque.push_back({t, std::move(p)});
         }
         std::ranges::sort(mDeque, [](const auto &lhs, const auto &rhs)
@@ -93,18 +94,30 @@ public:
         mCursorMap.erase(contextAddress);
     }
 
+// TODO i should enqueue with my receive time
     void enqueue(UFilterPickerPickBrokerAPI::V1::Pick &&pick)
     {
-        const auto now = std::chrono::high_resolution_clock::now().time_since_epoch();
+        const std::chrono::nanoseconds now
+        {
+            std::chrono::high_resolution_clock::now().time_since_epoch()
+        };
+        const auto oldestPickToKeep = now - mMaxHistory;
         {
         const std::lock_guard lock(mMutex);
-        purgeOldPicksLocked();
+        // Purge the expired picks
+        while (!mDeque.empty() && 
+               mDeque.front().first < oldestPickToKeep)
+        {
+            mDeque.pop_front();
+        }
+        // Add the pick
         mDeque.push_back({now, std::move(pick)});
         }
     }
 
-    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick>
-    getPicks(const uintptr_t contextAddress) const
+    [[nodiscard]]
+    std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getPicks(
+        const uintptr_t contextAddress) const
     {
         const std::lock_guard lock(mMutex);
         auto it = mCursorMap.find(contextAddress);
@@ -123,7 +136,7 @@ public:
     }
 
 //private:
-    void purgeOldPicksLocked()
+    void purgeOldPicksWhileMutexLocked()
     {
         const auto now
             = std::chrono::high_resolution_clock::now().time_since_epoch();
