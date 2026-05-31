@@ -1,7 +1,9 @@
+#include <chrono>
 #include <memory>
 #include <utility>
 #include <stdexcept>
 #include "uFilterPickerPickBroker/subscribeServiceOptions.hpp"
+#include "uFilterPickerPickBroker/pickStoreOptions.hpp"
 #include "uFilterPickerPickBroker/grpcServerOptions.hpp"
 
 using namespace UFilterPickerPickBroker;
@@ -10,8 +12,8 @@ class SubscribeServiceOptions::SubscribeServiceOptionsImpl
 {
 public:
     GRPCServerOptions mGRPCOptions;
+    PickStoreOptions mPickStoreOptions;
     int mMaximumNumberOfSubscribers{64};
-    int mQueueCapacity{8192};
     bool mHasGRPCOptions{false};
 };
 
@@ -86,16 +88,13 @@ int SubscribeServiceOptions::getMaximumNumberOfSubscribers() const noexcept
     return pImpl->mMaximumNumberOfSubscribers;
 }
 
-void SubscribeServiceOptions::setQueueCapacity(const int capacity)
+void SubscribeServiceOptions::setPickStoreOptions(
+    const PickStoreOptions &options)
 {
-    if (capacity < 1)
-    {
-        throw std::invalid_argument("Queue capacity must be positive");
-    }
-    pImpl->mQueueCapacity = capacity;
+    pImpl->mPickStoreOptions = options;
 }
 
-int SubscribeServiceOptions::getQueueCapacity() const noexcept
+PickStoreOptions SubscribeServiceOptions::getPickStoreOptions() const noexcept
 {
-    return pImpl->mQueueCapacity;
+    return pImpl->mPickStoreOptions;
 }

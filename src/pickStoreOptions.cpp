@@ -1,3 +1,4 @@
+#include <chrono>
 #include <utility>
 #include <memory>
 #include <stdexcept>
@@ -8,7 +9,8 @@ using namespace UFilterPickerPickBroker;
 class PickStoreOptions::PickStoreOptionsImpl
 {
 public:
-    int mMaximumQueueSize{2048};
+    std::chrono::seconds mMaximumRetentionDuration{std::chrono::minutes {15}};
+    int mMaximumQueueCapacity{8192};
 };
 
 /// Constructor
@@ -52,16 +54,32 @@ PickStoreOptions &PickStoreOptions::operator=(
 /// Destructor
 PickStoreOptions::~PickStoreOptions() = default;
 
-void PickStoreOptions::setMaximumQueueSize(const int maxSize)
+void PickStoreOptions::setMaximumQueueCapacity(const int maxCapacity)
 {
-    if (maxSize < 1)
+    if (maxCapacity < 1)
     {
         throw std::invalid_argument("Maximum queue size must be positive");
     }
-    pImpl->mMaximumQueueSize = maxSize;
+    pImpl->mMaximumQueueCapacity = maxCapacity;
 }
 
-int PickStoreOptions::getMaximumQueueSize() const noexcept
+int PickStoreOptions::getMaximumQueueCapacity() const noexcept
 {
-    return pImpl->mMaximumQueueSize;
+    return pImpl->mMaximumQueueCapacity;
+}
+
+void PickStoreOptions::setMaximumRetentionDuration(
+    const std::chrono::seconds &duration)
+{
+    if (duration.count() < 1)
+    {
+        throw std::invalid_argument("Pick retention duration must be positive");
+    }
+    pImpl->mMaximumRetentionDuration = duration;
+}
+
+std::chrono::seconds
+    PickStoreOptions::getMaximumRetentionDuration() const noexcept
+{
+    return pImpl->mMaximumRetentionDuration;
 }

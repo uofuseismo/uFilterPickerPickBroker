@@ -36,7 +36,8 @@ public:
     std::future<void> start();
 
     /// @brief Enqueues a pick to be written to consumers.
-    void enqueue(UFilterPickerPickBrokerAPI::V1::Pick &&pick);
+    void enqueue(const std::chrono::nanoseconds &receivedTime,
+                 UFilterPickerPickBrokerAPI::V1::Pick &&pick);
 
     /// @brief Stops the subscribe service and prevents the propagation of picks.
     void stop();

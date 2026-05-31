@@ -167,9 +167,8 @@ public:
         const auto subscribeServiceOptions
             = mOptions.getSubscribeServiceOptions();
         auto loadedPicks = mDatabase->load();
-        auto pickStoreCapacity = subscribeServiceOptions.getQueueCapacity();
-        PickStoreOptions pickStoreOptions;
-        pickStoreOptions.setMaximumQueueSize(pickStoreCapacity);
+        const auto pickStoreOptions
+            = subscribeServiceOptions.getPickStoreOptions();
         auto pickStore
             = std::make_unique<PickStore> (pickStoreOptions,
                                            loadedPicks,
@@ -323,24 +322,21 @@ public:
             if (gotPick)
             {
                 bool enqueuePick{false};
+                const auto now
+                    = std::chrono::high_resolution_clock::now()
+                      .time_since_epoch();
+                auto receivedTime = std::chrono::nanoseconds {now};
                 try
                 {
                     enqueuePick = true;
-                    const auto now 
-                        = std::chrono::high_resolution_clock::now()
-                          .time_since_epoch();
-                    const std::chrono::nanoseconds receivedTime
-                    {
-                        std::chrono::nanoseconds(now)
-                    };
                     mDatabase->add(receivedTime, pick);
                 }
                 catch (const UFilterPickerPickBroker::DuplicatePickException &e)
                 {
                     SPDLOG_LOGGER_DEBUG(
-                        mLogger,
-                        "Detected duplicate pick - will not propagate - details {}",
-                        std::string {e.what()});
+                      mLogger,
+                      "Detected duplicate pick; will not propagate because: {}",
+                      std::string {e.what()});
                     mMetrics.incrementDuplicatePicksReceivedCounter();
                     enqueuePick = false;
                 }
@@ -355,8 +351,10 @@ public:
                 {
                     try
                     {
-                        SPDLOG_LOGGER_INFO(mLogger, "Sending pick to subscribers");
-                        mSubscribeService->enqueue(std::move(pick));
+                        SPDLOG_LOGGER_DEBUG(mLogger,
+                                            "Sending pick to subscribers");
+                        mSubscribeService->enqueue(
+                            receivedTime, std::move(pick));
                     }
                     catch (const std::exception &e)
                     {

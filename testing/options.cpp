@@ -102,7 +102,10 @@ TEST_CASE("UFilterPickerPickBroker", "[SubscribeServiceOptions]")
     {
         const UFilterPickerPickBroker::SubscribeServiceOptions options;
         REQUIRE(options.getMaximumNumberOfSubscribers() == 64);
-        REQUIRE(options.getQueueCapacity() == 8192);
+        REQUIRE(options.getPickStoreOptions().getMaximumQueueCapacity()
+                == 8192);
+        REQUIRE(options.getPickStoreOptions().getMaximumRetentionDuration()
+                == std::chrono::minutes {15});
         REQUIRE(options.hasGRPCOptions() == false);
     }
 
@@ -112,21 +115,29 @@ TEST_CASE("UFilterPickerPickBroker", "[SubscribeServiceOptions]")
         constexpr uint16_t port{6432};
         constexpr int maxSubscribers{3833};
         constexpr int queueCapacity{910};
+        constexpr std::chrono::seconds maxDuration{8383};
         UFilterPickerPickBroker::GRPCServerOptions grpcOptions;
 
         grpcOptions.setHost(host);
         grpcOptions.setPort(port);
 
+        UFilterPickerPickBroker::PickStoreOptions pickStoreOptions;
+        pickStoreOptions.setMaximumQueueCapacity(queueCapacity);
+        pickStoreOptions.setMaximumRetentionDuration(maxDuration);
+
         UFilterPickerPickBroker::SubscribeServiceOptions options;
         REQUIRE_NOTHROW(options.setGRPCOptions(grpcOptions));
         REQUIRE_NOTHROW(options.setMaximumNumberOfSubscribers(maxSubscribers));
-        REQUIRE_NOTHROW(options.setQueueCapacity(queueCapacity));
+        REQUIRE_NOTHROW(options.setPickStoreOptions(pickStoreOptions));
 
         const UFilterPickerPickBroker::SubscribeServiceOptions copy{options};
         REQUIRE(copy.getGRPCOptions().getHost() == host);
         REQUIRE(copy.getGRPCOptions().getPort() == port);
         REQUIRE(copy.getMaximumNumberOfSubscribers() == maxSubscribers);
-        REQUIRE(copy.getQueueCapacity() == queueCapacity);
+        REQUIRE(copy.getPickStoreOptions().getMaximumQueueCapacity()
+                == queueCapacity);
+        REQUIRE(copy.getPickStoreOptions().getMaximumRetentionDuration()
+                == maxDuration);
     }
 }
 
@@ -185,16 +196,22 @@ TEST_CASE("UFilterPickerPickBroker", "[PickStoreOptions]")
     SECTION("Defaults")
     {
         const UFilterPickerPickBroker::PickStoreOptions options;
-        REQUIRE(options.getMaximumQueueSize() == 2048);
+        REQUIRE(options.getMaximumQueueCapacity() == 8192);
+        REQUIRE(options.getMaximumRetentionDuration() == std::chrono::minutes {15});
     }
     SECTION("Options")
     {
-        constexpr int maxQueueSize{732};
+        constexpr int maxQueueCapacity{732};
+        constexpr std::chrono::seconds retention{884};
         UFilterPickerPickBroker::PickStoreOptions options;
-        REQUIRE_THROWS(options.setMaximumQueueSize(0));
-        REQUIRE_NOTHROW(options.setMaximumQueueSize(maxQueueSize));
+        REQUIRE_THROWS(options.setMaximumQueueCapacity(0));
+        REQUIRE_NOTHROW(options.setMaximumQueueCapacity(maxQueueCapacity));
+        REQUIRE_THROWS(options.setMaximumRetentionDuration(
+            std::chrono::seconds {0}));
+        REQUIRE_NOTHROW(options.setMaximumRetentionDuration(retention));
 
         const UFilterPickerPickBroker::PickStoreOptions copy{options};
-        REQUIRE(options.getMaximumQueueSize() == maxQueueSize);
+        REQUIRE(options.getMaximumQueueCapacity() == maxQueueCapacity);
+        REQUIRE(options.getMaximumRetentionDuration() == retention);
     }
 }

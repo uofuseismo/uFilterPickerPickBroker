@@ -25,6 +25,7 @@
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/support/status.h>
 #include <grpcpp/support/server_callback.h>
+#include <grpcpp/support/time.h>
 #include "uFilterPickerPickBroker/subscribeService.hpp"
 #include "uFilterPickerPickBroker/subscribeServiceOptions.hpp"
 #include "uFilterPickerPickBroker/grpcServerOptions.hpp"
@@ -328,24 +329,36 @@ public:
             {
                 SPDLOG_LOGGER_INFO(mLogger, "Shutting down subscribe service");
             }
-            mServer->Shutdown();
+            constexpr int64_t timeOutSeconds{2};
+            constexpr int64_t timeOutNanoSeconds{0};
+            const gpr_timespec deadline
+            {
+                timeOutSeconds, timeOutNanoSeconds
+            };
+            mServer->Shutdown(deadline);
             if (mStarted)
             {
                 SPDLOG_LOGGER_INFO(mLogger, "Subscribe service shut down");
             }
+            mServer = nullptr;
         }
         mSubscriberCount.store(0);
         MetricsSingleton::getInstance().updateSubscribeServiceUtilization(0);
         mStarted = false;
     }
 
-    void enqueue(UFilterPickerPickBrokerAPI::V1::Pick &&pick)
+    void enqueue(const std::chrono::nanoseconds &receivedTime,
+                 UFilterPickerPickBrokerAPI::V1::Pick &&pick)
     {
-        mPickStore->enqueue(std::move(pick));
+        // Write pick to store
+        mPickStore->enqueue(receivedTime, std::move(pick));
+        // Enqueue the writers to try to get this pick and write 
+        {
         const std::lock_guard lock(mWritersMutex);
         for (auto *writer : mActiveWriters)
         {
             writer->tryWrite();
+        }
         }
     }
 
@@ -418,9 +431,11 @@ std::future<void> SubscribeService::start()
 }
 
 /// Enqueue a pick for delivery to all subscribers
-void SubscribeService::enqueue(UFilterPickerPickBrokerAPI::V1::Pick &&pick)
+void SubscribeService::enqueue(
+    const std::chrono::nanoseconds &receivedTime,
+    UFilterPickerPickBrokerAPI::V1::Pick &&pick)
 {
-    pImpl->enqueue(std::move(pick));
+    pImpl->enqueue(receivedTime, std::move(pick));
 }
 
 /// Stop the subscribe service

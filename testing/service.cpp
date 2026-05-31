@@ -3,9 +3,11 @@
 #include <condition_variable>
 #include <cmath>
 #include <filesystem>
+#include <format>
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -218,8 +220,13 @@ void runSubscriber()
              std::vector<UFilterPickerPickBrokerAPI::V1::Pick> *receivedPicks) :
             mReceivedPicks(receivedPicks)
         {
-            //mRequest.identifier(); //
-            //mRequest.backfill_duration();
+            google::protobuf::Duration backfillDuration;
+	    backfillDuration.set_seconds(0);
+            backfillDuration.set_nanos(0);
+            std::ostringstream oss;
+            oss << std::this_thread::get_id();
+            mRequest.set_identifier(oss.str());
+            *mRequest.mutable_backfill_duration() = backfillDuration;
             stub->async()->StreamSince(&mContext, &mRequest, this);
             StartRead(&mPick);
             StartCall();    
@@ -275,8 +282,11 @@ TEST_CASE("UFilterPickerPickBroker", "Service")
 {
     auto brokerThread = std::thread(&runBroker);
     std::this_thread::sleep_for(std::chrono::milliseconds {25});
+//    auto subscriberThread1 = std::thread(&runSubscriber);
+    std::this_thread::sleep_for(std::chrono::milliseconds {25});
     auto publisherThread1 = std::thread(&runPublisher);
      
     if (publisherThread1.joinable()){publisherThread1.join();}
+//    if (subscriberThread1.joinable()){subscriberThread1.join();}
     if (brokerThread.joinable()){brokerThread.join();}
 }

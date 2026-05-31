@@ -35,8 +35,10 @@ public:
     /// @{
 
     /// @brief Enqueues the next pick for publication to all subscribers.
-    /// @param[in,out] pick   The pick to send to subscribers.
-    void enqueue(UFilterPickerPickBrokerAPI::V1::Pick &&pick);
+    /// @param[in] receiveTime  The time that pick was received.
+    /// @param[in,out] pick     The pick to send to subscribers.
+    void enqueue(const std::chrono::nanoseconds &receiveTime,
+                 UFilterPickerPickBrokerAPI::V1::Pick &&pick);
     /// @}
 
     /// @name Subscriber Utilities

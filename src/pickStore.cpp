@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cstddef>
 #include <deque>
 #include <map>
 #include <memory>
@@ -55,6 +56,8 @@ public:
             mLogger = spdlog::stdout_color_mt("PickStoreConsole-" + classId);
             // NOLINTEND(misc-include-cleaner)
         }
+        mMaxHistory = mOptions.getMaximumRetentionDuration();
+        mMaxQueueCapacity = mOptions.getMaximumQueueCapacity();
         for (auto &[t, p] : backfillPicks)
         {
             mDeque.push_back({t, std::move(p)});
@@ -63,6 +66,7 @@ public:
                          {
                              return lhs.first < rhs.first;
                          });
+        cleanDeque();
     }
 
     void subscribe(const uintptr_t contextAddress)
@@ -94,24 +98,72 @@ public:
         mCursorMap.erase(contextAddress);
     }
 
-// TODO i should enqueue with my receive time
-    void enqueue(UFilterPickerPickBrokerAPI::V1::Pick &&pick)
+    // The key point about the contract is that it is about a minimum
+    // retention time.  But if there is space then we can be generous.
+    void cleanDeque(const std::chrono::nanoseconds &oldestPickToKeep)
+    {
+    const auto halfQueueCapacity
+        = static_cast<size_t> (mMaxQueueCapacity/2);
+    const std::lock_guard lock(mMutex);
+    if (!mDeque.empty())
+    {
+        // There's a ton of space - who cares
+        if (mDeque.size() < halfQueueCapacity){return;}
+        // Okay, let's clean up a bit to make space 
+        while (mDeque.front().first < oldestPickToKeep)
+        {
+            mDeque.pop_front();
+            if (mDeque.empty()){break;}
+        }
+    }
+
+    }
+
+    void cleanDeque()
     {
         const std::chrono::nanoseconds now
         {
             std::chrono::high_resolution_clock::now().time_since_epoch()
         };
         const auto oldestPickToKeep = now - mMaxHistory;
+        cleanDeque(oldestPickToKeep);
+    }
+   
+
+    void enqueue(const std::chrono::nanoseconds &receivedTime,
+                 UFilterPickerPickBrokerAPI::V1::Pick &&pick)
+    {
+        const std::chrono::nanoseconds now
+        {
+            std::chrono::high_resolution_clock::now().time_since_epoch()
+        };
+        const auto oldestPickToKeep = now - mMaxHistory;
+        if (receivedTime < oldestPickToKeep)
+        {
+            SPDLOG_LOGGER_WARN(mLogger, "Pick receipt time past expiration");
+        }
+        std::pair
+        < 
+            std::chrono::nanoseconds,
+            UFilterPickerPickBrokerAPI::V1::Pick
+        > itemToInsert{receivedTime, std::move(pick)};
+        cleanDeque();
         {
         const std::lock_guard lock(mMutex);
-        // Purge the expired picks
-        while (!mDeque.empty() && 
-               mDeque.front().first < oldestPickToKeep)
+        bool sortDeque = false;
+        if (!mDeque.empty())
         {
-            mDeque.pop_front();
+            sortDeque = mDeque.back().first > receivedTime;
         }
-        // Add the pick
-        mDeque.push_back({now, std::move(pick)});
+        mDeque.emplace_back(std::move(itemToInsert));
+        if (sortDeque)
+        {
+            std::sort(mDeque.begin(), mDeque.end(),
+                      [](const auto &lhs, const auto &rhs)
+            {
+                return lhs.first < rhs.first;
+            });
+        }
         }
     }
 
@@ -124,9 +176,9 @@ public:
         if (it == mCursorMap.end()) { return {}; }
         auto &cursor = it->second;
         std::vector<UFilterPickerPickBrokerAPI::V1::Pick> result;
-        for (const auto &[t, p] : mDeque)
+        for (const auto &[time, pick] : mDeque)
         {
-            if (t > cursor) { result.push_back(p); }
+            if (time > cursor) { result.push_back(pick); }
         }
         if (!result.empty())
         {
@@ -150,10 +202,17 @@ public:
     PickStoreOptions mOptions;
     std::shared_ptr<spdlog::logger> mLogger{nullptr};
     mutable std::map<uintptr_t, std::chrono::nanoseconds> mCursorMap;
-    std::deque<std::pair<std::chrono::nanoseconds,
-                         UFilterPickerPickBrokerAPI::V1::Pick>> mDeque;
+    std::deque
+    <
+        std::pair
+        <
+           std::chrono::nanoseconds,
+           UFilterPickerPickBrokerAPI::V1::Pick
+        >
+    > mDeque;
     mutable std::mutex mMutex;
-    const std::chrono::nanoseconds mMaxHistory{std::chrono::minutes{15}};
+    std::chrono::nanoseconds mMaxHistory{std::chrono::minutes{15}};
+    size_t mMaxQueueCapacity{8192}; 
 };
 
 PickStore::PickStore(const PickStoreOptions &options,
@@ -189,9 +248,10 @@ void PickStore::unsubscribe(const uintptr_t contextAddress)
     pImpl->unsubscribe(contextAddress);
 }
 
-void PickStore::enqueue(UFilterPickerPickBrokerAPI::V1::Pick &&pick)
+void PickStore::enqueue(const std::chrono::nanoseconds &receivedTime,
+                        UFilterPickerPickBrokerAPI::V1::Pick &&pick)
 {
-    pImpl->enqueue(std::move(pick));
+    pImpl->enqueue(receivedTime, std::move(pick));
 }
 
 std::vector<UFilterPickerPickBrokerAPI::V1::Pick>

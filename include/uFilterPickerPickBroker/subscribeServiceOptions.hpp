@@ -4,6 +4,7 @@
 namespace UFilterPickerPickBroker
 {
  class GRPCServerOptions;
+ class PickStoreOptions;
 }
 namespace UFilterPickerPickBroker
 {
@@ -36,6 +37,16 @@ public:
     void setQueueCapacity(int queueCapacity);
     /// @result The maximum output queue size.
     [[nodiscard]] int getQueueCapacity() const noexcept;
+
+    /// @brief Sets the maximum pick retention period.
+    void setMaximumRetentionDuration(const std::chrono::seconds &duration);
+    /// @result The maximum pick message retention duration.
+    [[nodiscard]] std::chrono::seconds getMaximumRetentionDuration() const noexcept;
+
+    /// @brief Sets the pick store options.
+    void setPickStoreOptions(const PickStoreOptions &options);
+    /// @result The pick store options.
+    [[nodiscard]] PickStoreOptions getPickStoreOptions() const noexcept;
 
     /// @brief Destructor.
     ~SubscribeServiceOptions();
