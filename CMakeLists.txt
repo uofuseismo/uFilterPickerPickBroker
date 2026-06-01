@@ -194,6 +194,7 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
    add_executable(unitTests
                   testing/database.cpp
                   testing/options.cpp
+                  testing/pickStore.cpp
                   testing/service.cpp
                   uFilterPickerPickBrokerAPI/v1/stream_identifier.proto
                   uFilterPickerPickBrokerAPI/v1/phase_hint.proto

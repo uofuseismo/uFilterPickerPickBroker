@@ -1,6 +1,12 @@
+#include <iostream>
+#include <algorithm>
+#ifndef NDEBUG
+#include <cassert>
+#endif
 #include <cstdint>
 #include <cstddef>
 #include <deque>
+#include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -8,7 +14,6 @@
 #include <vector>
 #include <chrono>
 #include <stdexcept>
-#include <algorithm>
 #include <spdlog/spdlog.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h> //NOLINT
@@ -17,6 +22,8 @@
 #include "uFilterPickerPickBrokerAPI/v1/pick.pb.h"
 
 using namespace UFilterPickerPickBroker;
+
+constexpr std::chrono::nanoseconds MAX_TIME{std::numeric_limits<int64_t>::max()};
 
 class PickStore::PickStoreImpl
 {
@@ -71,10 +78,8 @@ public:
 
     void subscribe(const uintptr_t contextAddress)
     {
-        const auto now
-            = std::chrono::high_resolution_clock::now().time_since_epoch();
         const std::lock_guard lock(mMutex);
-        mCursorMap.insert_or_assign(contextAddress, now);
+        mCursorMap.insert_or_assign(contextAddress, MAX_TIME);
     }
 
     void subscribe(const uintptr_t contextAddress,
@@ -82,7 +87,7 @@ public:
     {
         const auto now
             = std::chrono::high_resolution_clock::now().time_since_epoch();
-        if (startTime > now)
+        if (startTime > now && startTime != MAX_TIME)
         {
             throw std::invalid_argument("startTime cannot be in the future");
         }
@@ -164,6 +169,11 @@ public:
                 return lhs.first < rhs.first;
             });
         }
+        // Let newly arrived subscribers start getting picks
+        for (auto &item : mCursorMap)
+        {
+            if (item.second == MAX_TIME){item.second = mDeque.back().first;}
+        }
         }
     }
 
@@ -171,20 +181,49 @@ public:
     std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getPicks(
         const uintptr_t contextAddress) const
     {
+        std::vector<UFilterPickerPickBrokerAPI::V1::Pick> result;
+        {
         const std::lock_guard lock(mMutex);
         auto it = mCursorMap.find(contextAddress);
-        if (it == mCursorMap.end()) { return {}; }
-        auto &cursor = it->second;
-        std::vector<UFilterPickerPickBrokerAPI::V1::Pick> result;
+        if (it == mCursorMap.end()) 
+        {
+            SPDLOG_LOGGER_WARN(mLogger,
+                               "{} not in cursor map",
+                               contextAddress);
+            return result;
+        }
+        const auto cursor = it->second;
+        std::chrono::nanoseconds lastReadTime{cursor};
         for (const auto &[time, pick] : mDeque)
         {
-            if (time > cursor) { result.push_back(pick); }
+            if (time > cursor)
+            {
+                result.push_back(pick);
+                lastReadTime = time;
+            }
         }
         if (!result.empty())
         {
-            cursor = mDeque.back().first;
+#ifndef NDEBUG
+            assert(lastReadTime > cursor);
+#endif
+            it->second = lastReadTime;
+        }
         }
         return result;
+    }
+
+    [[nodiscard]] int getNumberOfSubscribers() const noexcept
+    {
+        const std::lock_guard lock(mMutex);
+        return static_cast<int> (mCursorMap.size());
+    }
+
+    [[nodiscard]]
+    bool isSubscribed(const uintptr_t contextAddress) const noexcept
+    {
+        const std::lock_guard lock(mMutex);
+        return mCursorMap.contains(contextAddress);
     }
 
 //private:
@@ -254,10 +293,27 @@ void PickStore::enqueue(const std::chrono::nanoseconds &receivedTime,
     pImpl->enqueue(receivedTime, std::move(pick));
 }
 
+void PickStore::enqueue(const std::chrono::nanoseconds &receivedTime,
+                        const UFilterPickerPickBrokerAPI::V1::Pick &pick)
+{
+   auto copy = pick;
+   enqueue(receivedTime, std::move(copy));
+}
+
 std::vector<UFilterPickerPickBrokerAPI::V1::Pick>
 PickStore::getPicks(const uintptr_t contextAddress) const
 {
     return pImpl->getPicks(contextAddress);
+}
+
+int PickStore::getNumberOfSubscribers() const noexcept
+{
+    return pImpl->getNumberOfSubscribers();
+}
+
+bool PickStore::isSubscribed(const uintptr_t contextAddress) const noexcept
+{
+    return pImpl->isSubscribed(contextAddress);
 }
 
 PickStore::~PickStore() = default;

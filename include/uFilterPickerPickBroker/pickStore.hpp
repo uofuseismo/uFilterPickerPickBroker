@@ -39,6 +39,10 @@ public:
     /// @param[in,out] pick     The pick to send to subscribers.
     void enqueue(const std::chrono::nanoseconds &receiveTime,
                  UFilterPickerPickBrokerAPI::V1::Pick &&pick);
+    void enqueue(const std::chrono::nanoseconds &receiveTime,
+                 const UFilterPickerPickBrokerAPI::V1::Pick &pick);
+    /// @result The number of subscribers.
+    [[nodiscard]] int getNumberOfSubscribers() const noexcept;
     /// @}
 
     /// @name Subscriber Utilities
@@ -56,6 +60,8 @@ public:
     /// @param[in] contextAddress  The memory address of the context that is
     ///                            subscribing.
     void subscribe(uintptr_t contextAddress);
+    /// @result True indicates this address is subscribed.
+    [[nodiscard]] bool isSubscribed(uintptr_t contextAddress) const noexcept;
 
     /// @brief Unsubscribes the context from the pick stream.
     /// @param[in] contextAddress  The memory address of the context that is

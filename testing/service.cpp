@@ -3,7 +3,6 @@
 #include <condition_variable>
 #include <cmath>
 #include <filesystem>
-#include <format>
 #include <memory>
 #include <mutex>
 #include <queue>

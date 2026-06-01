@@ -13,8 +13,8 @@
 #include "uFilterPickerPickBroker/database.hpp"
 #include "uFilterPickerPickBroker/exception.hpp"
 #include <uFilterPickerPickBrokerAPI/v1/pick.pb.h>
-#include <uFilterPickerPickBrokerAPI/v1/stream_identifier.pb.h>
-#include <uFilterPickerPickBrokerAPI/v1/phase_hint.pb.h>
+//#include <uFilterPickerPickBrokerAPI/v1/stream_identifier.pb.h>
+//#include <uFilterPickerPickBrokerAPI/v1/phase_hint.pb.h>
 #include <catch2/catch_test_macros.hpp>
 #include "utilities.hpp"
 
@@ -29,16 +29,35 @@ namespace
      return now;
 }
 
-
+/*
 bool comparePicks(const UFilterPickerPickBrokerAPI::V1::Pick &lhs,
                   const UFilterPickerPickBrokerAPI::V1::Pick &rhs)
 {
-    if (lhs.stream_identifier().network() != rhs.stream_identifier().network()){return false;}
-    if (lhs.stream_identifier().station() != rhs.stream_identifier().station()){return false;}
-    if (lhs.stream_identifier().channel() != rhs.stream_identifier().channel()){return false;}
-    if (lhs.stream_identifier().location_code() != rhs.stream_identifier().location_code()){return false;}
+    if (lhs.stream_identifier().network() !=
+        rhs.stream_identifier().network())
+    {
+        return false;
+    }
+    if (lhs.stream_identifier().station() !=
+        rhs.stream_identifier().station())
+    {
+        return false;
+    }
+    if (lhs.stream_identifier().channel() !=
+        rhs.stream_identifier().channel())
+    {
+        return false;
+    }
+    if (lhs.stream_identifier().location_code() !=
+        rhs.stream_identifier().location_code())
+    {
+        return false;
+    }
     if (google::protobuf::util::TimeUtil::TimestampToNanoseconds(lhs.time()) !=
-        google::protobuf::util::TimeUtil::TimestampToNanoseconds(rhs.time())){return false;}
+        google::protobuf::util::TimeUtil::TimestampToNanoseconds(rhs.time()))
+    {
+        return false;
+    }
     if (lhs.phase_hint() != rhs.phase_hint()){return false;}
     if (lhs.algorithm().name() != rhs.algorithm().name()){return false;}
     if (lhs.algorithm().version() != rhs.algorithm().version()){return false;}
@@ -56,6 +75,7 @@ bool containsPick(const UFilterPickerPickBrokerAPI::V1::Pick &needle,
     }
     return false;
 }
+*/
 
 }
 
