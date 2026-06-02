@@ -7,7 +7,6 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <set>
 #include <string>
 #include <thread>
 #include <chrono>
@@ -105,7 +104,6 @@ public:
                                mMaximumNumberOfSubscribers);
             Finish({grpc::StatusCode::RESOURCE_EXHAUSTED,
                     "Maximum subscriber limit reached"});
-            return;
         }
 
         // Authenticate (if we have certs and there is an access token)
@@ -121,7 +119,6 @@ public:
                                         mPeer);
                      Finish({grpc::StatusCode::UNAUTHENTICATED,
                              "Invalid access token"});
-                     return;
                 }
             }
         }
@@ -147,7 +144,6 @@ public:
                                     mPeer, std::string {e.what()});
                 Finish({grpc::StatusCode::INTERNAL,
                         "Server error - failed to subscribe with backfill"});
-                return;
             }
         }
         else
@@ -179,6 +175,7 @@ public:
             mPeer, nSubscribers, utilization);
 
         // Start it up
+        mWriteInProgress = false;
         nextWrite();
     }
 
@@ -186,14 +183,17 @@ public:
     {
         while (mKeepRunning->load())
         {
+            // Handle cancellation
+            if (mContext->IsCancelled()){break;}
+
             // Send another one
-            if (!mPicksQueue.empty() &&
-                !mWriteInProgress.load(std::memory_order_seq_cst))
+            if (!mPicksQueue.empty() && !mWriteInProgress)
             {
-                mPick = mPicksQueue.front();
-                mWriteInProgress.store(true, std::memory_order_seq_cst);
-SPDLOG_LOGGER_INFO(mLogger, "WRiting");
-                StartWrite(&mPick);
+                const auto &pick = mPicksQueue.front();
+                mWriteInProgress = true;
+                mMetrics.incrementPicksSentCounter();
+                StartWrite(&pick);
+                return;
             }
             // Try to get more
             if (mPicksQueue.empty())
@@ -215,12 +215,10 @@ SPDLOG_LOGGER_INFO(mLogger, "WRiting");
                                     std::string {e.what()});
                 }
             }
-            else
+                
+            if (mPicksQueue.empty() && !mWriteInProgress)
             {
-                if (!mWriteInProgress.load(std::memory_order_seq_cst))
-                {
-                    std::this_thread::sleep_for(mTimeOut);
-                }
+                std::this_thread::sleep_for(mTimeOut);
             }
         }
         // We're done (for some reason)
@@ -251,7 +249,7 @@ SPDLOG_LOGGER_INFO(mLogger, "WRiting");
                     SPDLOG_LOGGER_DEBUG(mLogger,
                                         "{} issued dlient cancel",
                                         mPeer);
-                    return Finish(grpc::Status::OK);
+                    return Finish(grpc::Status::CANCELLED);
                 }
             }
             return Finish(grpc::Status {grpc::StatusCode::UNKNOWN,
@@ -262,34 +260,9 @@ SPDLOG_LOGGER_INFO(mLogger, "WRiting");
             return Finish({grpc::StatusCode::UNAVAILABLE,
                            "Server shutdown - try again later"});
         }
-        mWriteInProgress.store(false, std::memory_order_seq_cst);
+        mWriteInProgress = false;
         mPicksQueue.pop();
         nextWrite();
-/*
-        // Okay, write another pick
-        ++mPendingIndex;
-        if (mPendingIndex < mPendingPicks.size())
-        {
-            //StartWrite(&mPendingPicks[mPendingIndex]);
-            return;
-        }
-        //mPendingPicks.clear();
-        mPendingIndex = 0;
-        auto more = mStore->getPicks(mContextAddress);
-        if (!more.empty())
-        {
-            //mPendingPicks = std::move(more);
-            //StartWrite(&mPendingPicks[0]);
-            return;
-        }
-        mWriteInProgress.store(false, std::memory_order_seq_cst);
-        more = mStore->getPicks(mContextAddress);
-        if (!more.empty() && !mWriteInProgress.exchange(true))
-        {
-            //mPendingPicks = std::move(more);
-            //StartWrite(&mPickQueue[0]);
-        }
-*/
     }
 
     void OnDone() override
@@ -322,8 +295,6 @@ SPDLOG_LOGGER_INFO(mLogger, "WRiting");
         }
     }
 
-    [[nodiscard]] bool isRegistered() const noexcept { return mRegistered; }
-
 private:
     grpc::CallbackServerContext *mContext{nullptr};
     PickStore *mStore{nullptr};
@@ -339,9 +310,9 @@ private:
     std::string mPeer;
     uintptr_t mContextAddress{0};
     std::chrono::milliseconds mTimeOut{15};
-    std::atomic<bool> mWriteInProgress{false};
-    size_t mMaximumQueueSize{128};
-    size_t mPendingIndex{0};
+    bool mWriteInProgress{false};
+    //size_t mMaximumQueueSize{128};
+    //size_t mPendingIndex{0};
     int mMaximumNumberOfSubscribers{64};
     bool mRegistered{false};
 };
@@ -460,21 +431,13 @@ public:
     {
         // Write pick to store
         mPickStore->enqueue(receivedTime, std::move(pick));
-        // Enqueue the writers to try to get this pick and write 
-        {
-        const std::lock_guard lock(mWritersMutex);
-        for (auto *writer : mActiveWriters)
-        {
-            writer->nextWrite();
-        }
-        }
     }
 
     grpc::ServerWriteReactor<UFilterPickerPickBrokerAPI::V1::Pick>*
     StreamSince(grpc::CallbackServerContext *context,
                 const UFilterPickerPickBrokerAPI::V1::StreamSinceRequest *request) override
     {
-        auto *writer = new ::AsynchronousWriter(
+        return new ::AsynchronousWriter(
             mOptions,
             context,
             request,
@@ -483,12 +446,6 @@ public:
             &mSubscriberCount,
             mSecured,
             mLogger);
-        if (writer->isRegistered())
-        {
-            const std::lock_guard lock(mWritersMutex);
-            mActiveWriters.insert(writer);
-        }
-        return writer;
     }
 
     ~SubscribeServiceImpl() override
@@ -502,7 +459,6 @@ private:
     std::unique_ptr<PickStore> mPickStore;
     std::shared_ptr<spdlog::logger> mLogger{nullptr};
     std::unique_ptr<grpc::Server> mServer{nullptr};
-    std::set<::AsynchronousWriter *> mActiveWriters;
     std::mutex mWritersMutex;
     UFilterPickerPickBroker::MetricsSingleton &mMetrics
     {

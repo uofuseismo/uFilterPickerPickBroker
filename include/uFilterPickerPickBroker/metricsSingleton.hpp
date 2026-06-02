@@ -33,7 +33,12 @@ public:
     /// @brief Increments the duplicate picks received counter.
     void incrementDuplicatePicksReceivedCounter();
     /// @result The number of duplicate picks received.
-    [[nodiscard]] int64_t getDupcliatePicksReceivedCount() const noexcept;
+    [[nodiscard]] int64_t getDuplicatePicksReceivedCount() const noexcept;
+
+    /// @brief Increments the number of picks sent counter.
+    void incrementPicksSentCounter();
+    /// @result The number of sent picks.
+    [[nodiscard]] int64_t getPicksSentCount() const noexcept;
 
     /// @brief Updates the publish service utilization.
     /// @param[in] utilization  This utilization in the range of [0, 1].
@@ -56,6 +61,7 @@ private:
     std::atomic<int64_t> mPicksReceivedCounter{0};
     std::atomic<int64_t> mInvalidPicksReceivedCounter{0};
     std::atomic<int64_t> mDuplicatePicksCounter{0};
+    std::atomic<int64_t> mPicksSentCounter{0};
     std::atomic<double> mPublishServiceUtilization{0};
     std::atomic<double> mSubscribeServiceUtilization{0};
 };

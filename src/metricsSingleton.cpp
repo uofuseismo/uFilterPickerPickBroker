@@ -21,6 +21,7 @@ void MetricsSingleton::resetCounters()
     mPicksReceivedCounter.store(0, std::memory_order_relaxed);
     mInvalidPicksReceivedCounter.store(0, std::memory_order_relaxed);
     mDuplicatePicksCounter.store(0, std::memory_order_relaxed);
+    mPicksSentCounter.store(0, std::memory_order_relaxed);
     mPublishServiceUtilization.store(0, std::memory_order_relaxed);
     mSubscribeServiceUtilization.store(0, std::memory_order_relaxed);
 }
@@ -63,9 +64,20 @@ void MetricsSingleton::incrementDuplicatePicksReceivedCounter()
     mDuplicatePicksCounter.fetch_add(one, std::memory_order_relaxed);
 }
 
-int64_t MetricsSingleton::getDupcliatePicksReceivedCount() const noexcept
+int64_t MetricsSingleton::getDuplicatePicksReceivedCount() const noexcept
 {
     return mDuplicatePicksCounter.load(std::memory_order_relaxed);
+}
+
+void MetricsSingleton::incrementPicksSentCounter()
+{
+    constexpr int64_t one{1};
+    mPicksSentCounter.fetch_add(one, std::memory_order_relaxed);
+}
+
+int64_t MetricsSingleton::getPicksSentCount() const noexcept
+{
+    return mPicksSentCounter.load(std::memory_order_relaxed);
 }
 
 void MetricsSingleton::updatePublishServiceUtilization(const double utilization)

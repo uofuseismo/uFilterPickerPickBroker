@@ -180,6 +180,11 @@ public:
         mInitialized = true;
     }
 
+    ~BrokerImpl()
+    {
+        stop();
+    }
+
     /// Start the broker
     void start()
     {
@@ -192,6 +197,7 @@ public:
         assert(mSubscribeService != nullptr);
         assert(mDatabase->isOpen());
 #endif
+        mShutdownRequested = false;
         mKeepRunning.store(true);
         // Start receiving things ASAP
         mPublishServiceFuture = mPublishService->start();
@@ -208,23 +214,29 @@ public:
     void stop()
     {
         mKeepRunning.store(false);
+        mShutdownRequested = true;
+        mShutdownCondition.notify_one();
         constexpr std::chrono::milliseconds pause{15};
         if (mPublishService)
         {
             SPDLOG_LOGGER_INFO(mLogger, "Stopping publish service");
             mPublishService->stop();
             std::this_thread::sleep_for(pause);
+            mPublishService = nullptr;
         }
         if (mSubscribeService)
         {
             SPDLOG_LOGGER_DEBUG(mLogger, "Stopping subscribe service");
             mSubscribeService->stop();
             std::this_thread::sleep_for(pause);
+            mSubscribeService = nullptr;
         }
-        mDatabase->close();
+        if (mDatabase)
+        {
+            mDatabase->close();
+            mDatabase = nullptr;
+        }
         mIsRunning.store(false);
-        mShutdownRequested = true;
-        mShutdownCondition.notify_all();
 
         if (mPublishServiceFuture.valid()){mPublishServiceFuture.get();}
         if (mPickProcessorFuture.valid()){mPickProcessorFuture.get();}
