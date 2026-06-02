@@ -10,7 +10,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <uFilterPickerPickBrokerAPI/v1/pick.pb.h>
 #include <uFilterPickerPickBrokerAPI/v1/phase_hint.pb.h>
-#include <uFilterPickerPickBrokerAPI/v1/stream_identifier.pb.h>
+//#include <uFilterPickerPickBrokerAPI/v1/stream_identifier.pb.h>
 #include "uFilterPickerPickBroker/pickStore.hpp"
 #include "uFilterPickerPickBroker/pickStoreOptions.hpp"
 #include "utilities.hpp"
@@ -72,7 +72,7 @@ TEST_CASE("UFilterPickerPickBroker", "[PickStore]")
         const int nPicks = 100;
         auto picks = ::generatePicks(nPicks);
         auto logger = spdlog::stdout_color_mt("ps-no-backfill-1"); // NOLINT
-        PickStoreOptions options;
+        const PickStoreOptions options;
         PickStore store{options, logger};
         // Send the first half
         const auto nHalf = static_cast<int> (nPicks/2);
@@ -84,7 +84,7 @@ TEST_CASE("UFilterPickerPickBroker", "[PickStore]")
         const std::uintptr_t id1{101};
         const std::uintptr_t id2{102};
         REQUIRE(store.getNumberOfSubscribers() == 0);
-        store.subscribe(id1, picks.at(0).first - std::chrono::seconds {1});
+        store.subscribe(id1, picks.at(0).first); // - std::chrono::seconds {1});
         REQUIRE(store.isSubscribed(id1) == true);
         store.subscribe(id2); // Subscribe to first new pick
         REQUIRE(store.isSubscribed(id2) == true);
@@ -111,16 +111,13 @@ TEST_CASE("UFilterPickerPickBroker", "[PickStore]")
         REQUIRE(static_cast<int> (picksBack12.size()) ==
                 std::max(0, nHalfPicks10 - nHalf));
         REQUIRE(static_cast<int> (picksBack22.size()) ==
-                std::max(0, nHalfPicks10 - nHalf - 1));
+                std::max(0, nHalfPicks10 - nHalf));
         for (int i = nHalf; i < nHalfPicks10; ++i)
         {
             REQUIRE(comparePicks(picksBack12.at(i - nHalf),
                                  picks.at(i).second) == true);
-            if (i > nHalf)
-            {
-                REQUIRE(comparePicks(picksBack22.at(i - nHalf - 1),
-                                     picks.at(i).second) == true);
-            }
+            REQUIRE(comparePicks(picksBack22.at(i - nHalf),
+                                 picks.at(i).second) == true);
         }
 
         store.unsubscribe(id1);

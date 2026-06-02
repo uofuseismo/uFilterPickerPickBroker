@@ -196,7 +196,7 @@ public:
         std::chrono::nanoseconds lastReadTime{cursor};
         for (const auto &[time, pick] : mDeque)
         {
-            if (time > cursor)
+            if (time >= cursor)
             {
                 result.push_back(pick);
                 lastReadTime = time;
@@ -207,7 +207,10 @@ public:
 #ifndef NDEBUG
             assert(lastReadTime > cursor);
 #endif
-            it->second = lastReadTime;
+            // Update the read time but add a slight tolerance so we
+            // don't re-read the last pick.
+            constexpr std::chrono::nanoseconds epsilon{1};
+            it->second = lastReadTime + epsilon;
         }
         }
         return result;
