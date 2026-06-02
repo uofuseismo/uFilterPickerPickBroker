@@ -179,7 +179,8 @@ public:
 
     [[nodiscard]]
     std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getPicks(
-        const uintptr_t contextAddress) const
+        const uintptr_t contextAddress,
+        const int maximumNumberOfPicks) const
     {
         std::vector<UFilterPickerPickBrokerAPI::V1::Pick> result;
         {
@@ -200,6 +201,11 @@ public:
             {
                 result.push_back(pick);
                 lastReadTime = time;
+            }
+            if (static_cast<int> (result.size()) >=
+                maximumNumberOfPicks)
+            {
+                break;
             }
         }
         if (!result.empty())
@@ -306,7 +312,18 @@ void PickStore::enqueue(const std::chrono::nanoseconds &receivedTime,
 std::vector<UFilterPickerPickBrokerAPI::V1::Pick>
 PickStore::getPicks(const uintptr_t contextAddress) const
 {
-    return pImpl->getPicks(contextAddress);
+    return getPicks(contextAddress, std::numeric_limits<int16_t>::max());
+}
+
+std::vector<UFilterPickerPickBrokerAPI::V1::Pick>
+PickStore::getPicks(const uintptr_t contextAddress,
+                    const int maxNumberOfPicks) const
+{
+    if (maxNumberOfPicks < 1)
+    {
+        throw std::invalid_argument("Maximum number of picks must be positive");
+    }
+    return pImpl->getPicks(contextAddress, maxNumberOfPicks);
 }
 
 int PickStore::getNumberOfSubscribers() const noexcept

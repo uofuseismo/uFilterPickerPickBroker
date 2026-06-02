@@ -72,6 +72,7 @@ public:
     /// @param contextAddress  The subscribing context address.
     /// @return The latest picks to send to the subscriber.
     [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getPicks(uintptr_t contextAddress) const;
+    [[nodiscard]] std::vector<UFilterPickerPickBrokerAPI::V1::Pick> getPicks(uintptr_t contextAddress, const int maximumNumberOfPicks) const;
     /// @}
 
     /// @brief  Destructor.

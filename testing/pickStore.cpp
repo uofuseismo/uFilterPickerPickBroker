@@ -123,12 +123,20 @@ TEST_CASE("UFilterPickerPickBroker", "[PickStore]")
         store.unsubscribe(id1);
         REQUIRE(store.isSubscribed(id1) == false);
         REQUIRE(store.getNumberOfSubscribers() == 1);
-        // Get rest
+        // Send rest
         for (int i = nHalfPicks10; i < nPicks; ++i)
         {
             store.enqueue(picks.at(i).first, picks.at(i).second);
         }
-        auto picksBack23 = store.getPicks(id2);
+        // Stream rest
+        std::vector<UFilterPickerPickBrokerAPI::V1::Pick> picksBack23;
+        for (int k = 0; k < 32768; ++k)
+        {
+            auto thesePicks = store.getPicks(id2, 2);
+            if (thesePicks.empty()){break;}
+	    for (auto &p : thesePicks){picksBack23.push_back(std::move(p));}
+        }
+        //auto picksBack23 = store.getPicks(id2, 10);
         REQUIRE(static_cast<int> (picksBack23.size()) ==
                 std::max(0, nPicks - nHalfPicks10));
         for (int i = nHalfPicks10; i < nPicks; ++i)

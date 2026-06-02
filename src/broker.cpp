@@ -438,7 +438,7 @@ public:
         const auto now
             = std::chrono::duration_cast<std::chrono::nanoseconds>
               ((std::chrono::high_resolution_clock::now()).time_since_epoch());
-std::cout << pickTime << " " << now << std::endl;
+        //std::cout << pickTime << " " << now << std::endl;
         if (pickTime > now)
         {
             throw std::invalid_argument("Pick cannot be from future");

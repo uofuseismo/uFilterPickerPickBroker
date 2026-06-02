@@ -281,11 +281,11 @@ TEST_CASE("UFilterPickerPickBroker", "Service")
 {
     auto brokerThread = std::thread(&runBroker);
     std::this_thread::sleep_for(std::chrono::milliseconds {25});
-//    auto subscriberThread1 = std::thread(&runSubscriber);
+    //auto subscriberThread1 = std::thread(&runSubscriber);
     std::this_thread::sleep_for(std::chrono::milliseconds {25});
     auto publisherThread1 = std::thread(&runPublisher);
      
     if (publisherThread1.joinable()){publisherThread1.join();}
-//    if (subscriberThread1.joinable()){subscriberThread1.join();}
+    //if (subscriberThread1.joinable()){subscriberThread1.join();}
     if (brokerThread.joinable()){brokerThread.join();}
 }

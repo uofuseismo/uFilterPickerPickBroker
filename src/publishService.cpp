@@ -22,7 +22,7 @@
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/support/status.h>
 #include <grpcpp/support/server_callback.h>
-#include <grpcpp/support/time.h>
+#include <grpcpp/support/time.h> //NOLINT
 #include "uFilterPickerPickBroker/exception.hpp"
 #include "uFilterPickerPickBroker/publishService.hpp"
 #include "uFilterPickerPickBroker/publishServiceOptions.hpp"
@@ -141,7 +141,7 @@ public:
             ++mTotalPicks;
             try
             {
-SPDLOG_LOGGER_INFO(mLogger, "Pushing current pick");
+                SPDLOG_LOGGER_DEBUG(mLogger, "Pushing current pick");
                 mCallback(std::move(mCurrentPick));
                 mInvalidMessageCounter = 0;
             }
@@ -373,9 +373,11 @@ public:
             SPDLOG_LOGGER_INFO(mLogger, "Shutting down server");
             constexpr int64_t timeOutSeconds{2};
             constexpr int64_t timeOutNanoSeconds{0};
-            const gpr_timespec deadline
+            const gpr_timespec deadline //NOLINT
             {
-                timeOutSeconds, timeOutNanoSeconds, GPR_TIMESPAN
+                timeOutSeconds,
+                timeOutNanoSeconds,
+                GPR_TIMESPAN //NOLINT
             };
             mServer->Shutdown(deadline);
             SPDLOG_LOGGER_INFO(mLogger, "Server shut down");

@@ -2,7 +2,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
+#include <exception>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <queue>
 #include <utility>
 #include <vector>
 #include <stdexcept>
@@ -25,7 +26,7 @@
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/support/status.h>
 #include <grpcpp/support/server_callback.h>
-#include <grpcpp/support/time.h>
+#include <grpcpp/support/time.h> //NOLINT
 #include "uFilterPickerPickBroker/subscribeService.hpp"
 #include "uFilterPickerPickBroker/subscribeServiceOptions.hpp"
 #include "uFilterPickerPickBroker/grpcServerOptions.hpp"
@@ -34,6 +35,9 @@
 #include "uFilterPickerPickBrokerAPI/v1/subscribe_service.grpc.pb.h"
 #include "uFilterPickerPickBrokerAPI/v1/pick.pb.h"
 #include "uFilterPickerPickBrokerAPI/v1/stream_since_request.pb.h"
+
+// Chunk the output by this many picks at a time
+#define MAXIMUM_QUEUE_SIZE 32
 
 using namespace UFilterPickerPickBroker;
 
@@ -66,14 +70,12 @@ public:
         grpc::CallbackServerContext *context,
         const UFilterPickerPickBrokerAPI::V1::StreamSinceRequest *request,
         PickStore *store,
-        std::function<void(AsynchronousWriter *)> unregisterCallback,
         const std::atomic<bool> *keepRunning,
         std::atomic<int> *subscriberCount,
         const bool isSecured,
         std::shared_ptr<spdlog::logger> logger) :
         mContext(context),
         mStore(store),
-        mUnregisterCallback(std::move(unregisterCallback)),
         mKeepRunning(keepRunning),
         mSubscriberCount(subscriberCount),
         mLogger(std::move(logger))
@@ -85,9 +87,17 @@ public:
         assert(mSubscriberCount != nullptr);
 #endif
         mPeer = context->peer();
+        if (request)
+        {
+            if (!request->identifier().empty())
+            {
+                mPeer = mPeer + " (" + request->identifier() + ")";
+            }
+        }
         mContextAddress = reinterpret_cast<uintptr_t>(context);
         mMaximumNumberOfSubscribers = options.getMaximumNumberOfSubscribers();
 
+        // Can we afford another subscriber?
         if (mSubscriberCount->load() >= mMaximumNumberOfSubscribers)
         {
             SPDLOG_LOGGER_WARN(mLogger,
@@ -98,34 +108,66 @@ public:
             return;
         }
 
-        const auto grpcOptions = options.getGRPCOptions();
-        const auto accessToken = grpcOptions.getAccessToken();
-
-        if (isSecured && accessToken != std::nullopt)
+        // Authenticate (if we have certs and there is an access token)
+        if (isSecured)
         {
-            if (!::validateSubscriber(context, *accessToken))
+            const auto accessToken = options.getGRPCOptions().getAccessToken();
+            if (accessToken != std::nullopt)
             {
-                SPDLOG_LOGGER_WARN(mLogger,
-                                   "Unauthorized subscriber {} rejected", mPeer);
-                Finish({grpc::StatusCode::UNAUTHENTICATED, "Invalid access token"});
-                return;
+                if (!::validateSubscriber(context, *accessToken))
+                {
+                     SPDLOG_LOGGER_WARN(mLogger,
+                                        "Unauthorized subscriber {} rejected",
+                                        mPeer);
+                     Finish({grpc::StatusCode::UNAUTHENTICATED,
+                             "Invalid access token"});
+                     return;
+                }
             }
         }
 
+        // Try subscribing 
         const auto now
             = std::chrono::high_resolution_clock::now().time_since_epoch();
         if (request->has_backfill_duration())
         {
-            const auto &dur = request->backfill_duration();
-            const auto backfillNs = std::chrono::seconds(dur.seconds())
-                                  + std::chrono::nanoseconds(dur.nanos());
-            mStore->subscribe(mContextAddress, now - backfillNs);
+            // Figure out the receive times this subscriber wants
+            const auto &duration = request->backfill_duration();
+            const auto backfillNanoSeconds
+                 = std::chrono::seconds(duration.seconds())
+                 + std::chrono::nanoseconds(duration.nanos());
+            try
+            {
+                mStore->subscribe(mContextAddress, now - backfillNanoSeconds);
+            }
+            catch (const std::exception &e)
+            {
+                SPDLOG_LOGGER_ERROR(mLogger,
+                                    "Failed to subscribe {} because {}",
+                                    mPeer, std::string {e.what()});
+                Finish({grpc::StatusCode::INTERNAL,
+                        "Server error - failed to subscribe with backfill"});
+                return;
+            }
         }
         else
         {
-            mStore->subscribe(mContextAddress);
+            // Otherwise, they'll happily takes what shows up next
+            try
+            {
+                mStore->subscribe(mContextAddress);
+            }
+            catch (const std::exception &e)
+            {
+                SPDLOG_LOGGER_ERROR(mLogger,
+                                    "Failed to subscribe {} because {}",
+                                    mPeer, std::string {e.what()});
+                Finish({grpc::StatusCode::INTERNAL,
+                        "Server error - failed to subscribe"});
+            }
         }
 
+        // Update
         const auto nSubscribers = mSubscriberCount->fetch_add(1) + 1;
         const auto utilization
             = static_cast<double>(nSubscribers)
@@ -135,61 +177,119 @@ public:
         SPDLOG_LOGGER_INFO(mLogger,
             "Pick subscriber connected {}; SubscribeService managing {} subscribers ({} pct utilized)",
             mPeer, nSubscribers, utilization);
-        tryWrite();
+
+        // Start it up
+        nextWrite();
     }
 
-    void tryWrite()
+    void nextWrite()
     {
-        if (mWriteInProgress.exchange(true)) { return; }
-        auto picks = mStore->getPicks(mContextAddress);
-        if (picks.empty())
+        while (mKeepRunning->load())
         {
-            // Release lock with seq_cst barrier so any concurrent enqueue that
-            // missed us sees mWriteInProgress=false before its tryWrite call
-            mWriteInProgress.store(false, std::memory_order_seq_cst);
-            // Double-check for picks inserted between getPicks and store
-            picks = mStore->getPicks(mContextAddress);
-            if (picks.empty() || mWriteInProgress.exchange(true)) { return; }
+            // Send another one
+            if (!mPicksQueue.empty() &&
+                !mWriteInProgress.load(std::memory_order_seq_cst))
+            {
+                mPick = mPicksQueue.front();
+                mWriteInProgress.store(true, std::memory_order_seq_cst);
+SPDLOG_LOGGER_INFO(mLogger, "WRiting");
+                StartWrite(&mPick);
+            }
+            // Try to get more
+            if (mPicksQueue.empty())
+            {
+                try
+                {
+                    auto newPicks
+                        = mStore->getPicks(mContextAddress, MAXIMUM_QUEUE_SIZE);
+                    for (auto &pick : newPicks)
+                    {
+                        mPicksQueue.push(std::move(pick));
+                    }
+                }
+                catch (const std::exception &e)
+                {
+                    SPDLOG_LOGGER_ERROR(mLogger,
+                                    "Failed to get new picks for {} because {}",
+                                    mPeer,
+                                    std::string {e.what()});
+                }
+            }
+            else
+            {
+                if (!mWriteInProgress.load(std::memory_order_seq_cst))
+                {
+                    std::this_thread::sleep_for(mTimeOut);
+                }
+            }
         }
-        mPendingPicks = std::move(picks);
-        mPendingIndex = 0;
-        StartWrite(&mPendingPicks[mPendingIndex]);
+        // We're done (for some reason)
+        if (mContext)
+        {
+            if (mContext->IsCancelled())
+            {
+                SPDLOG_LOGGER_INFO(mLogger, "{} issued cancel", mPeer);
+                Finish(grpc::Status::CANCELLED);
+            }
+            else
+            {
+                SPDLOG_LOGGER_INFO(mLogger, "Server cancelling {}", mPeer);
+                Finish(grpc::Status::OK);
+            }
+        }
     }
 
     void OnWriteDone(bool ok) override
     {
+        // Likely a cancel but deal with it
         if (!ok)
         {
-            Finish(grpc::Status::OK);
-            return;
+            if (mContext)
+            {
+                if (mContext->IsCancelled())
+                {
+                    SPDLOG_LOGGER_DEBUG(mLogger,
+                                        "{} issued dlient cancel",
+                                        mPeer);
+                    return Finish(grpc::Status::OK);
+                }
+            }
+            return Finish(grpc::Status {grpc::StatusCode::UNKNOWN,
+                                        "Unknown server error"});
         }
         if (!mKeepRunning->load(std::memory_order_relaxed))
         {
-            Finish({grpc::StatusCode::UNAVAILABLE, "Server shutdown - try again later"});
-            return;
+            return Finish({grpc::StatusCode::UNAVAILABLE,
+                           "Server shutdown - try again later"});
         }
+        mWriteInProgress.store(false, std::memory_order_seq_cst);
+        mPicksQueue.pop();
+        nextWrite();
+/*
+        // Okay, write another pick
         ++mPendingIndex;
         if (mPendingIndex < mPendingPicks.size())
         {
-            StartWrite(&mPendingPicks[mPendingIndex]);
+            //StartWrite(&mPendingPicks[mPendingIndex]);
             return;
         }
-        mPendingPicks.clear();
+        //mPendingPicks.clear();
         mPendingIndex = 0;
         auto more = mStore->getPicks(mContextAddress);
         if (!more.empty())
         {
-            mPendingPicks = std::move(more);
-            StartWrite(&mPendingPicks[0]);
+            //mPendingPicks = std::move(more);
+            //StartWrite(&mPendingPicks[0]);
             return;
         }
         mWriteInProgress.store(false, std::memory_order_seq_cst);
         more = mStore->getPicks(mContextAddress);
         if (!more.empty() && !mWriteInProgress.exchange(true))
         {
-            mPendingPicks = std::move(more);
-            StartWrite(&mPendingPicks[0]);
+            //mPendingPicks = std::move(more);
+            //StartWrite(&mPickQueue[0]);
         }
+*/
     }
 
     void OnDone() override
@@ -197,16 +297,16 @@ public:
         if (mRegistered)
         {
             mStore->unsubscribe(mContextAddress);
-            const int nSubscribers = mSubscriberCount->fetch_sub(1) - 1;
-            const auto utilization
-                = static_cast<double>(nSubscribers)
-                 / std::max(1, mMaximumNumberOfSubscribers);
-            mMetrics.updateSubscribeServiceUtilization(utilization);
-            SPDLOG_LOGGER_DEBUG(mLogger,
-                "{} disconnected; Now managing {} subscribers ({} pct utilized)",
-                mPeer, nSubscribers, utilization);
+            mRegistered = false;
         }
-        mUnregisterCallback(this);
+        const int nSubscribers = mStore->getNumberOfSubscribers(); //mSubscriberCount->fetch_sub(1) - 1;
+        const auto utilization
+            = static_cast<double>(nSubscribers)
+             / std::max(1, mMaximumNumberOfSubscribers);
+        mMetrics.updateSubscribeServiceUtilization(utilization);
+        SPDLOG_LOGGER_DEBUG(mLogger,
+            "{} disconnected; Now managing {} subscribers ({} pct utilized)",
+            mPeer, nSubscribers, utilization);
         delete this;
     }
 
@@ -215,7 +315,11 @@ public:
         SPDLOG_LOGGER_INFO(mLogger,
                            "Async subscribe service RPC canceled by {}",
                            mPeer);
-        Finish(grpc::Status::CANCELLED);
+        if (mRegistered)
+        {
+            mStore->unsubscribe(mContextAddress);
+            mRegistered = false;
+        }
     }
 
     [[nodiscard]] bool isRegistered() const noexcept { return mRegistered; }
@@ -223,7 +327,6 @@ public:
 private:
     grpc::CallbackServerContext *mContext{nullptr};
     PickStore *mStore{nullptr};
-    std::function<void(AsynchronousWriter *)> mUnregisterCallback;
     const std::atomic<bool> *mKeepRunning{nullptr};
     std::atomic<int> *mSubscriberCount{nullptr};
     std::shared_ptr<spdlog::logger> mLogger;
@@ -231,10 +334,13 @@ private:
     {
         UFilterPickerPickBroker::MetricsSingleton::getInstance()
     };
-    std::vector<UFilterPickerPickBrokerAPI::V1::Pick> mPendingPicks;
+    std::queue<UFilterPickerPickBrokerAPI::V1::Pick> mPicksQueue;
+    UFilterPickerPickBrokerAPI::V1::Pick mPick;
     std::string mPeer;
     uintptr_t mContextAddress{0};
+    std::chrono::milliseconds mTimeOut{15};
     std::atomic<bool> mWriteInProgress{false};
+    size_t mMaximumQueueSize{128};
     size_t mPendingIndex{0};
     int mMaximumNumberOfSubscribers{64};
     bool mRegistered{false};
@@ -331,9 +437,11 @@ public:
             }
             constexpr int64_t timeOutSeconds{2};
             constexpr int64_t timeOutNanoSeconds{0};
-            const gpr_timespec deadline
+            const gpr_timespec deadline // NOLINT
             {
-                timeOutSeconds, timeOutNanoSeconds
+                timeOutSeconds,
+                timeOutNanoSeconds,
+                GPR_TIMESPAN // NOLINT
             };
             mServer->Shutdown(deadline);
             if (mStarted)
@@ -357,15 +465,9 @@ public:
         const std::lock_guard lock(mWritersMutex);
         for (auto *writer : mActiveWriters)
         {
-            writer->tryWrite();
+            writer->nextWrite();
         }
         }
-    }
-
-    void unregisterWriter(::AsynchronousWriter *writer)
-    {
-        const std::lock_guard lock(mWritersMutex);
-        mActiveWriters.erase(writer);
     }
 
     grpc::ServerWriteReactor<UFilterPickerPickBrokerAPI::V1::Pick>*
@@ -377,7 +479,6 @@ public:
             context,
             request,
             mPickStore.get(),
-            [this](::AsynchronousWriter *w) { unregisterWriter(w); },
             &mKeepRunning,
             &mSubscriberCount,
             mSecured,
