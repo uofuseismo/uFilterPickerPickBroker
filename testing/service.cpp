@@ -52,6 +52,8 @@ namespace
 #define SUBSCRIBE_SERVICE_HOST "localhost"
 #define SUBSCRIBE_SERVICE_PORT 58154
 
+std::vector<UFilterPickerPickBrokerAPI::V1::Pick> referencePicks;
+
 
 void runBroker()
 {
@@ -197,6 +199,7 @@ void runPublisher()
                                  phaseHint);
         picks.push_back(std::move(pick));
     }
+    referencePicks = picks;
 
     // Create the publisher
     const auto address = std::string {PUBLISH_SERVICE_HOST} + ":"
@@ -234,7 +237,6 @@ void runSubscriber()
         {
             if (ok)
             {
-std::cout <<"Got one" << std::endl;
                 mReceivedPicks->push_back(mPick);
                 StartRead(&mPick);
             } 
@@ -274,6 +276,13 @@ std::cout <<"Got one" << std::endl;
     Subscriber subscriber(stub.get(), &receivedPicks);
     auto status = subscriber.await();
     REQUIRE(status.ok());
+    // Check the sent/received
+    REQUIRE(receivedPicks.size() == referencePicks.size());
+    for (int i = 0; i < static_cast<int> (referencePicks.size()); ++i)
+    {
+        REQUIRE(::comparePicks(receivedPicks.at(i),
+                               referencePicks.at(i)) == true);
+    }
 }
 
 }
@@ -281,9 +290,9 @@ std::cout <<"Got one" << std::endl;
 TEST_CASE("UFilterPickerPickBroker", "Service")
 {
     auto brokerThread = std::thread(&runBroker);
-    std::this_thread::sleep_for(std::chrono::milliseconds {25});
+    std::this_thread::sleep_for(std::chrono::milliseconds {35});
     auto subscriberThread1 = std::thread(&runSubscriber);
-    std::this_thread::sleep_for(std::chrono::milliseconds {25});
+    std::this_thread::sleep_for(std::chrono::milliseconds {35});
     auto publisherThread1 = std::thread(&runPublisher);
      
     if (publisherThread1.joinable()){publisherThread1.join();}

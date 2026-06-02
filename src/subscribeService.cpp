@@ -215,7 +215,7 @@ public:
                                     std::string {e.what()});
                 }
             }
-                
+
             if (mPicksQueue.empty() && !mWriteInProgress)
             {
                 std::this_thread::sleep_for(mTimeOut);
