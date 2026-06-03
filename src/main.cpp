@@ -1,6 +1,7 @@
 #include <atomic>
 #include <csignal>
 #include <cstdlib>
+#include <cstdint>
 #include <chrono>
 #include <condition_variable>
 #include <exception>
@@ -193,8 +194,28 @@ public:
     ///        supposed to.
     void printSummary()
     {
-        /// 
+        /// Summary 
         if (mOptions.printSummaryInterval.count() <= 0){return;}
+        const auto now = 
+            std::chrono::duration_cast<std::chrono::seconds>
+            ((std::chrono::high_resolution_clock::now()).time_since_epoch());
+        if (now < mLastReport + mOptions.printSummaryInterval){return;}
+        mLastReport = now;
+        auto &metrics
+             = UFilterPickerPickBroker::MetricsSingleton::getInstance();
+        auto nPicksReceived = metrics.getPicksReceivedCount();
+        auto nPicksSent = metrics.getPicksSentCount();
+        auto nReportReceived = nPicksReceived - mPicksReceivedLastReport;
+        auto nReportSent = nPicksSent - mPicksSentLastReport;
+        auto publishServiceUtilization = metrics.getPublishServiceUtilization();
+        auto subscribeServiceUtilization = metrics.getSubscribeServiceUtilization();
+        SPDLOG_LOGGER_INFO(mLogger,
+           "Received {} picks; sent {} picks since last report.  Publish service is {} utilized and subscribe service is {} utilized.",
+           nReportReceived, nReportSent,
+           publishServiceUtilization,
+           subscribeServiceUtilization);
+        mPicksReceivedLastReport = nPicksReceived;
+        mPicksSentLastReport = nPicksSent;
     }
 
     /// @brief Checks for errors on the threads.
@@ -272,6 +293,13 @@ public:
     std::unique_ptr<UFilterPickerPickBroker::Broker> mBroker{nullptr};
     mutable std::mutex mStopMutex;
     std::condition_variable mStopCondition;
+    std::chrono::seconds mLastReport
+    {
+        std::chrono::duration_cast<std::chrono::seconds>
+        ((std::chrono::high_resolution_clock::now()).time_since_epoch())
+    };
+    int64_t mPicksReceivedLastReport{0};
+    int64_t mPicksSentLastReport{0};
     bool mStopRequested{false};
     bool mIsRunning{false};
 };
