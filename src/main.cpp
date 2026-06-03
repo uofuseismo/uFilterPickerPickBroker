@@ -15,6 +15,9 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <opentelemetry/metrics/provider.h>
+#include <opentelemetry/metrics/meter.h>
+#include <opentelemetry/nostd/shared_ptr.h>
 #include "uFilterPickerPickBroker/broker.hpp"
 #include "uFilterPickerPickBroker/brokerOptions.hpp"
 #include "uFilterPickerPickBroker/metricsSingleton.hpp"
@@ -28,6 +31,20 @@ namespace
 volatile std::sig_atomic_t mSignalStatus;
 std::atomic_bool mInterrupted{false};
 
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    receivedPicksCounter;
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    invalidPicksCounter;
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    duplicatePicksCounter;
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    picksSentCounter;
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    overflowPicksCounter;
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    subscribeServiceUtilizationGauge;
+opentelemetry::nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+    publishServiceUtilizationGauge;
 }
 
 
@@ -72,6 +89,82 @@ public:
                 std::move(database),
                 mLogger);
 
+        // Setup metrics
+        if (mOptions.exportMetrics)
+        {
+            // Need a provider from which to get a meter.  This is initialized
+            // once and should last the duration of the application.
+            auto provider
+                = opentelemetry::metrics::Provider::GetMeterProvider();
+
+            // Meter will be bound to application (library, module, class, etc.)
+            // so as to identify who is genreating these metrics.
+            auto meter = provider->GetMeter(mOptions.applicationName, "1.2.0");
+
+            // Picks received
+            receivedPicksCounter
+                = meter->CreateInt64ObservableCounter(
+                  "seismic_processing.detection.ufilter_picker_broker.client.received_picks",
+                  "Number of picks received from instances of the uFilterPicker",
+                  "{message}");
+            receivedPicksCounter->AddCallback(
+                UFilterPickerPickBroker::Metrics::observeNumberOfPicksReceived,
+                nullptr);
+
+            invalidPicksCounter
+                = meter->CreateInt64ObservableCounter(
+                  "seismic_processing.detection.ufilter_picker_broker.client.invalid_picks",
+                  "Number of invalid picks received from instances of the uFilterPicker",
+                  "{message}");
+            invalidPicksCounter->AddCallback(
+                UFilterPickerPickBroker::Metrics::observeNumberOfInvalidPicksReceived,
+                nullptr);
+
+            duplicatePicksCounter
+                = meter->CreateInt64ObservableCounter(
+                  "seismic_processing.detection.ufilter_picker_broker.client.duplicate_picks",
+                  "Number of duplicate picks received from instances of the uFilterPicker",
+                  "{message}");
+            duplicatePicksCounter->AddCallback(
+                UFilterPickerPickBroker::Metrics::observeNumberOfDuplicatePicksReceived,
+                nullptr);
+
+            overflowPicksCounter
+                = meter->CreateInt64ObservableCounter(
+                  "seismic_processing.detection.ufilter_picker_broker.client.overflow_picks",
+                  "Number of picks that overflowed input buffer - this indicates a config problem",
+                  "{message}");
+            overflowPicksCounter->AddCallback(
+                UFilterPickerPickBroker::Metrics::observeOverflowPicksCount,
+                nullptr);
+
+            picksSentCounter
+                = meter->CreateInt64ObservableCounter(
+                  "seismic_processing.detection.ufilter_picker_broker.server.sent_picks",
+                  "Number of picks sent by the subscribe service"
+                  "{message}");
+            picksSentCounter->AddCallback(
+                UFilterPickerPickBroker::Metrics::observePicksSentCount,
+                nullptr);
+
+            publishServiceUtilizationGauge
+                = meter->CreateDoubleObservableGauge(
+                  "seismic_processing.detection.ufilter_picker_broker.server.utilization",
+                  "Proportion of publishers sending picks to the publish service",
+                  "");
+            publishServiceUtilizationGauge->AddCallback(
+                UFilterPickerPickBroker::Metrics::observePublishServiceUtilization,
+                nullptr);
+
+            subscribeServiceUtilizationGauge
+                = meter->CreateDoubleObservableGauge(
+                  "seismic_processing.detection.ufilter_picker_broker.server.utilization",
+                  "Proportion of subscribers receiving picks from the subscribe service",
+                  "");
+            subscribeServiceUtilizationGauge->AddCallback(
+                UFilterPickerPickBroker::Metrics::observeSubscribeServiceUtilization,
+                nullptr);
+        }
     }
 
     void start()

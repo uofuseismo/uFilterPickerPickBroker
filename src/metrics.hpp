@@ -22,6 +22,7 @@
 
 namespace
 {
+
 bool metricsInitialized{false};
 
 void initializeHTTP(
@@ -146,6 +147,231 @@ void cleanup()
         opentelemetry::sdk::metrics::Provider::SetMeterProvider(none);
     }   
     metricsInitialized = false;
+}
+
+void observeNumberOfPicksReceived(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult))
+    {
+        auto observer = opentelemetry::nostd::get
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult);
+        try
+        {
+            auto &instance = MetricsSingleton::getInstance();
+            auto value = instance.getPicksReceivedCount();
+            observer->Observe(value);
+        }
+        catch (const std::exception &e)
+        {
+
+        }
+    }
+}
+
+void observeNumberOfInvalidPicksReceived(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult))
+    {
+        auto observer = opentelemetry::nostd::get
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult);
+        try
+        {
+            auto &instance = MetricsSingleton::getInstance();
+            auto value = instance.getInvalidPicksReceivedCount();
+            observer->Observe(value);
+        }
+        catch (const std::exception &e)
+        {
+
+        }
+    }
+}
+
+
+void observeNumberOfDuplicatePicksReceived(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult))
+    {
+        auto observer = opentelemetry::nostd::get
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult);
+        try
+        {
+            auto &instance = MetricsSingleton::getInstance();
+            auto value = instance.getDuplicatePicksReceivedCount();
+            observer->Observe(value);
+        }
+        catch (const std::exception &e)
+        {
+
+        }
+    }
+}
+
+void observeOverflowPicksCount(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult))
+    {
+        auto observer = opentelemetry::nostd::get
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult);
+        try
+        {
+            auto &instance = MetricsSingleton::getInstance();
+            auto value = instance.getOverflowInputPicksCount();
+            observer->Observe(value);
+        }
+        catch (const std::exception &e)
+        {
+
+        }
+    }
+}
+
+void observePicksSentCount(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult))
+    {
+        auto observer = opentelemetry::nostd::get
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<int64_t>
+            >
+        > (observerResult);
+        try
+        {
+            auto &instance = MetricsSingleton::getInstance();
+            auto value = instance.getPicksSentCount();
+            observer->Observe(value);
+        }
+        catch (const std::exception &e)
+        {
+
+        }
+    }
+}
+
+void observeSubscribeServiceUtilization(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<double>
+            >
+        > (observerResult))
+    {
+        auto observer = opentelemetry::nostd::get
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<double>
+            >
+        > (observerResult);
+        try
+        {
+            auto &instance = MetricsSingleton::getInstance();
+            auto value = instance.getSubscribeServiceUtilization();
+            observer->Observe(value);
+        }
+        catch (const std::exception &e)
+        {
+
+        }
+    }
+}
+
+void observePublishServiceUtilization(
+    opentelemetry::metrics::ObserverResult observerResult,
+    void *)
+{
+    if (opentelemetry::nostd::holds_alternative
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+                opentelemetry::metrics::ObserverResultT<double>
+            >
+        > (observerResult))
+    {
+        auto observer = opentelemetry::nostd::get
+        <
+            opentelemetry::nostd::shared_ptr
+            <
+               opentelemetry::metrics::ObserverResultT<double>
+            >
+        > (observerResult);
+        try
+        {
+            auto &instance = MetricsSingleton::getInstance();
+            auto value = instance.getPublishServiceUtilization();
+            observer->Observe(value);
+        }
+        catch (const std::exception &e)
+        {
+
+        }
+    }
 }
 
 }
