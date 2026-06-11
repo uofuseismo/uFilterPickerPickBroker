@@ -10,6 +10,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <stdlib.h>
 #include <string>
 #include <thread>
 #include <utility>
@@ -347,6 +348,13 @@ int main(int argc, char *argv[])
                                std::string {e.what()});
         return EXIT_FAILURE;
     }  
+    if (getenv("OTEL_SERVICE_NAME") == nullptr)
+    {
+        constexpr int overwrite{1};
+        setenv("OTEL_SERVICE_NAME",
+               programOptions.applicationName.c_str(),
+               overwrite);
+    }
 
     // Create the logger
     std::shared_ptr<spdlog::logger> logger{nullptr};

@@ -1,4 +1,3 @@
-#include <iostream>
 #include <cstdint>
 #include <cstddef>
 #include <cctype>
@@ -7,7 +6,6 @@
 #include <utility>
 #include <memory>
 #include <string>
-#include <vector>
 #include <exception>
 #include <functional>
 #include <future>
@@ -450,7 +448,6 @@ public:
         const auto now
             = std::chrono::duration_cast<std::chrono::nanoseconds>
               ((std::chrono::high_resolution_clock::now()).time_since_epoch());
-        //std::cout << pickTime << " " << now << std::endl;
         if (pickTime > now)
         {
             throw std::invalid_argument("Pick cannot be from future");
@@ -460,10 +457,12 @@ public:
         while (mInputQueue.size() >= mMaximumInputQueueSize)
         {
             SPDLOG_LOGGER_WARN(mLogger, "Popping pick from queue");
+            mMetrics.incrementOverflowInputPicksCounter();
             mInputQueue.pop();
         }
         mInputQueue.push(std::move(pick));
         }
+        mMetrics.incrementPicksReceivedCounter();
     }
 
     /// @result True indicates the broker is still running
