@@ -1,3 +1,5 @@
+#ifndef OTEL_SPDLOG_SINK_HPP
+#define OTEL_SPDLOG_SINK_HPP
 /*
  * Copyright The OpenTelemetry Authors
  * SPDX-License-Identifier: Apache-2.0
@@ -86,3 +88,4 @@ protected:
 };
 
 }  // namespace spdlog::sinks
+#endif
