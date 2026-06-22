@@ -241,7 +241,7 @@ public:
         {
             if (mInterrupted)
             {
-                 SPDLOG_LOGGER_INFO(mLogger,
+                SPDLOG_LOGGER_INFO(mLogger,
                                    "SIGINT/SIGTERM signal received!");
                 mStopRequested = true;
                 break;
