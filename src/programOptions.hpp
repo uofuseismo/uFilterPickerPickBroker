@@ -19,7 +19,6 @@
 #include "uFilterPickerPickBroker/grpcServerOptions.hpp"
 #include "uFilterPickerPickBroker/database.hpp"
 #include "otelOptions.hpp"
-#include "programOptions.hpp"
 
 namespace
 {
