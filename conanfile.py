@@ -13,8 +13,7 @@ class uFilterPickerPickBrokerConan(ConanFile):
    options = {"build_tests" : [True, False],
               "build_training" : [True, False],
               "with_conan" : [True, False]}
-   default_options = {"hwloc/*:shared": "True",
-                      "opentelemetry-cpp/*:with_otlp_http": "True",
+   default_options = {"opentelemetry-cpp/*:with_otlp_http": "True",
                       "opentelemetry-cpp/*:with_otlp_grpc": "True",
                       "opentelemetry-cpp/*:with_abi_v2" : "True",
                       "spdlog/*:header_only" : "True",
@@ -26,13 +25,12 @@ class uFilterPickerPickBrokerConan(ConanFile):
 
    def requirements(self):
        # dependencies
-       self.requires("grpc/1.78.1")
-       self.requires("opentelemetry-cpp/1.24.0")
+       self.requires("grpc/1.82.0")
+       self.requires("opentelemetry-cpp/1.26.0")
        self.requires("protobuf/6.33.5")
        self.requires("boost/1.89.0")
        self.requires("spdlog/1.17.0")
        self.requires("sqlite3/3.53.0")
-       self.requires("onetbb/2022.3.0")
 
    def build_requirements(self):
        # test dependncies and build tools
