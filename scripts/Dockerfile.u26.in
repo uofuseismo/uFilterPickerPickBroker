@@ -1,0 +1,25 @@
+# Purpose: Creates the container for running the uFilterPickerPickBroker software in
+#          a Ubuntu container.
+# Usage: podman build -t ufilterpickerpickbroker:latest -f Dockerfile.u26
+#        buildah bud -t ufilterpickerpickbroker:latest -f Dockerfile.u26
+FROM ubuntu:26.04
+COPY @PROJECT_NAME@-@PROJECT_VERSION@-Linux.tar.gz .
+LABEL version="@PROJECT_VERSION@"
+RUN apt-get update &&\
+    apt-get upgrade -y &&\
+    apt-get autoremove -y &&\
+    apt-get autoclean -y &&\
+    apt-get -y install bash &&\
+    apt-get -y install openssl &&\
+    apt-get autoremove -y &&\
+    apt-get clean &&\
+    tar -xf ./@PROJECT_NAME@-@PROJECT_VERSION@-Linux.tar.gz &&\
+    mv ./@PROJECT_NAME@-@PROJECT_VERSION@-Linux/bin/uFilterPickerPickBroker /usr/local/bin &&\
+    rm -r ./@PROJECT_NAME@-@PROJECT_VERSION@-Linux/ &&\
+    rm -r /var/lib/apt/lists/* ./@PROJECT_NAME@-@PROJECT_VERSION@-Linux.tar.gz
+
+#RUN useradd -ms /bin/bash us8 
+#USER us8 
+#WORKDIR /home/us8
+
+#CMD /usr/local/bin/uFilterPickerMesageStore --config=config.ini
