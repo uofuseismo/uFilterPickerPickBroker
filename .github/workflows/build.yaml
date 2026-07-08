@@ -21,8 +21,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        #distro: [ubuntu-24.04, ubuntu-24.04-arm]
-        distro: [ubuntu-24.04]
+        #distro: [ubuntu-26.04, ubuntu-26.04-arm]
+        distro: [ubuntu-26.04]
         arch: [x86]
         BUILD_TARGET: [Release]
     name: Build for ${{ matrix.distro }} ${{ matrix.arch }}
@@ -85,7 +85,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        distro: [ubuntu-24.04]
+        distro: [ubuntu-26.04]
         arch: [x86]
     name: Test on ${{ matrix.distro }} ${{ matrix.arch }}
 
@@ -107,14 +107,8 @@ jobs:
 
   package:
     needs: test
-    runs-on: ${{ matrix.distro }}
-    strategy:
-      fail-fast: false
-      matrix:
-        distro: [ubuntu-24.04]
-        arch: [x86]
-        BUILD_TARGET: [Release]
-    name: Package for ${{ matrix.distro }} ${{ matrix.arch }}
+    runs-on: ubuntu-26.04
+    name: Package container and ship to quay
 
     steps:
       - uses: actions/checkout@v6
@@ -145,7 +139,7 @@ jobs:
           cp artifacts/*tar.gz ./
           version=$(ls *tar.gz | sed 's/uFilterPickerPickBroker-//g' | sed 's/-Linux.tar.gz//g')
           echo "Will build container version ${version}"
-          buildah bud -t ${CONTAINER_NAME}:${version} -t ${CONTAINER_NAME}:latest -f ./Dockerfile.u24
+          buildah bud -t ${CONTAINER_NAME}:${version} -t ${CONTAINER_NAME}:latest -f ./Dockerfile.u26
           buildah tag ${CONTAINER_NAME}:${version} quay.io/uuss/${QUAY_DIRECTORY}:${version}
           buildah push quay.io/uuss/${QUAY_DIRECTORY}:${version}
 
