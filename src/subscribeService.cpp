@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <atomic>
-#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <future>
@@ -392,20 +391,18 @@ public:
         SPDLOG_LOGGER_INFO(mLogger,
                            "SubscribeService listening at {}", address);
         mServer = builder.BuildAndStart();
+        mServerStarted.store(true);
         mServer->Wait();
-        mStarted = true;
+        mServerStarted.store(false);
     }
 
     void stop()
     {
         mKeepRunning.store(false);
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
-        if (mServer)
+        if (mServer && mServerStarted.load())
         {
-            if (mStarted)
-            {
-                SPDLOG_LOGGER_INFO(mLogger, "Shutting down subscribe service");
-            }
+            SPDLOG_LOGGER_INFO(mLogger, "Shutting down subscribe service");
             constexpr int64_t timeOutSeconds{2};
             constexpr int64_t timeOutNanoSeconds{0};
             const gpr_timespec deadline // NOLINT
@@ -415,15 +412,11 @@ public:
                 GPR_TIMESPAN // NOLINT
             };
             mServer->Shutdown(deadline);
-            if (mStarted)
-            {
-                SPDLOG_LOGGER_INFO(mLogger, "Subscribe service shut down");
-            }
+            mServerStarted.store(false);
             mServer = nullptr;
         }
         mSubscriberCount.store(0);
         MetricsSingleton::getInstance().updateSubscribeServiceUtilization(0);
-        mStarted = false;
     }
 
     void enqueue(const std::chrono::nanoseconds &receivedTime,
@@ -467,7 +460,7 @@ private:
     std::atomic<int> mSubscriberCount{0};
     std::atomic<bool> mKeepRunning{true};
     bool mSecured{false};
-    bool mStarted{false};
+    std::atomic<bool> mServerStarted{false};
 };
 
 /// Constructor

@@ -361,16 +361,18 @@ public:
         SPDLOG_LOGGER_INFO(mLogger,
                            "PublishService listening at {}", address);
         mServer = builder.BuildAndStart();
+        mServerStarted.store(true);
         mServer->Wait();
+        mServerStarted.store(false);
     }
 
     void stop()
     {
         mKeepRunning.store(false);
         std::this_thread::sleep_for(std::chrono::milliseconds {10});
-        if (mServer)
+        if (mServer && mServerStarted.load())
         {
-            SPDLOG_LOGGER_INFO(mLogger, "Shutting down server");
+            SPDLOG_LOGGER_INFO(mLogger, "Shutting down publish server");
             constexpr int64_t timeOutSeconds{2};
             constexpr int64_t timeOutNanoSeconds{0};
             const gpr_timespec deadline //NOLINT
@@ -380,8 +382,9 @@ public:
                 GPR_TIMESPAN //NOLINT
             };
             mServer->Shutdown(deadline);
-            SPDLOG_LOGGER_INFO(mLogger, "Server shut down");
+            mServerStarted.store(false);
             mServer = nullptr;
+            SPDLOG_LOGGER_INFO(mLogger, "Publish server shut down");
         }
         mPublisherCount.store(0);
         MetricsSingleton::getInstance().updatePublishServiceUtilization(0);
@@ -414,6 +417,7 @@ public:
     std::unique_ptr<grpc::Server> mServer{nullptr};
     std::atomic<int> mPublisherCount{0};
     std::atomic<bool> mKeepRunning{true};
+    std::atomic<bool> mServerStarted{false};
     bool mSecured{false};
 };
 
