@@ -1,3 +1,5 @@
+#ifndef UFILTER_PICKER_PICK_BROKER_LOGGER
+#define UFILTER_PICKER_PICK_BROKER_LOGGER
 #include <utility>
 #include <string>
 #include <mutex>
@@ -178,3 +180,4 @@ void cleanup()
 }
 
 }
+#endif
